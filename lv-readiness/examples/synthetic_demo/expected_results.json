@@ -1,0 +1,30 @@
+{
+  "input_sha256": "81eb4aa3930d5840b242362438e63900909506dd36b1337a0aa1d76b1a44ffed",
+  "analytic_prior_mean": 0.8358316562692756,
+  "analytic_posterior_mean": 0.7986232147953535,
+  "seed": 1,
+  "n_prior": 200000,
+  "n_posterior": 50000,
+  "python_top_summary": {
+    "Node": "q_top",
+    "PriorNSamples": 200000,
+    "PostNSamples": 50000,
+    "PriorMean": 0.8357799735892198,
+    "PriorStd": 0.05965788260258191,
+    "PriorMedian": 0.8425957942003169,
+    "PriorP025": 0.7011947681620992,
+    "PriorP95": 0.9206857363536989,
+    "PriorP975": 0.9315511756300414,
+    "PriorPexc": 0.99997,
+    "PriorPmeet": 2.999999999997449e-05,
+    "PostMean": 0.7984797486636922,
+    "PostStd": 0.06360594023971011,
+    "PostMedian": 0.8044352703630838,
+    "PostP025": 0.6576204220794439,
+    "PostP95": 0.8920509355789107,
+    "PostP975": 0.9052972945852622,
+    "PostPexc": 0.99988,
+    "PostPmeet": 0.000120000000000009
+  },
+  "environment": "requirements-verified.txt"
+}
