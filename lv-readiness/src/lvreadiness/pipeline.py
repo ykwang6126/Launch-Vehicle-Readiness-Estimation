@@ -57,22 +57,41 @@ def run_analysis(input_path: str | Path, output_dir: str | Path,
     Numerical outputs are reproducible in a pinned Python environment. MATLAB
     uses different random samplers; identical seeds do not imply identical draws.
     """
+
+    # 1. Validate runtime settings used to run the Monte Carlo analysis.
     validate_runtime(n_prior, n_posterior, seed)
     input_path = Path(input_path).resolve()
-    cleaned, profiles, settings, excluded = validate_input(read_input(input_path))
+
+    # 2. Read the assessment workbook and validate/clean the MATLAB_Input data.
+    raw_input = read_input(input_path)
+    cleaned, profiles, settings, excluded = validate_input(raw_input)
+
+    # 3. Convert each (Component, RaterID) profile into a Beta prior.
     profiles = build_priors(profiles, settings.lambda_phase)
+
+    # 4. Summarize the equal-weight rater pools and sample component priors.
     pools = summarize_pools(profiles)
     rng = np.random.Generator(np.random.PCG64(seed))
     basic = sample_components(profiles, n_prior, rng)
+
+    # 5. Propagate the seven component failure probabilities through the fault tree.
     prior = np.column_stack((basic, fault_tree_nodes(basic)))
+
+    # 6. Update the prior using top-event binomial test evidence, then resample jointly.
     weights = posterior_weights(prior[:, -1], settings.n_test, settings.k_fail)
     posterior, indices, ess = resample_joint(prior, weights, n_posterior, rng)
+
+    # 7. Compute posterior diagnostics and summarize all 11 model nodes.
     weighted_mean, weighted_variance = weighted_moments(prior, weights)
     summary = summarize_nodes(prior, posterior, settings.q_req)
+
+    # 8. Run the legacy average-score method only for the required comparison output.
     legacy = fault_tree_nodes(sample_averaged_scores(profiles, settings.lambda_phase, n_prior, rng))[:, -1]
     legacy_weights = posterior_weights(legacy, settings.n_test, settings.k_fail)
     legacy_post = legacy[rng.choice(n_prior, n_posterior, p=legacy_weights)]
     comparison = pooling_comparison(prior[:, -1], posterior[:, -1], legacy, legacy_post)
+
+    # 9. Create a unique run folder and assemble reproducibility metadata.
     run_dir, stamp = _create_run(Path(output_dir).resolve())
 
     def matlab_array(values: tuple) -> str:
@@ -101,7 +120,10 @@ def run_analysis(input_path: str | Path, output_dir: str | Path,
                     WeightedPosteriorVariance=weighted_variance.tolist())
     tables = dict(RunInfo=pd.DataFrame([info]), RaterParameters=profiles, PoolSummary=pools,
                   NodeSummary=summary, PoolingComparison=comparison)
+
+    # 10. Export figures, tables, run configuration, and metadata.
     plot_results(profiles, pools, prior[:, -1], posterior[:, -1], legacy,
                  settings.n_test, settings.k_fail, run_dir/"figures")
     paths = export_results(run_dir, tables, config, metadata)
+
     return AnalysisResult(tables, paths, prior, posterior, weights, indices, weighted_mean, weighted_variance)
