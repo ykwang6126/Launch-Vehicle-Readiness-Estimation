@@ -58,7 +58,8 @@ def run_analysis(input_path: str | Path, output_dir: str | Path,
     uses different random samplers; identical seeds do not imply identical draws.
     """
 
-    # 1. Validate runtime settings used to run the Monte Carlo analysis.
+    # 1. Validate run options.
+    # n_prior/n_posterior are Monte Carlo sample counts, not numbers of raters.
     validate_runtime(n_prior, n_posterior, seed)
     input_path = Path(input_path).resolve()
 
@@ -69,23 +70,36 @@ def run_analysis(input_path: str | Path, output_dir: str | Path,
     # 3. Convert each (Component, RaterID) profile into a Beta prior.
     profiles = build_priors(profiles, settings.lambda_phase)
 
-    # 4. Summarize the equal-weight rater pools and sample component priors.
+    # 4A. Summarize each component's equal-weight rater mixture for reporting.
     pools = summarize_pools(profiles)
+
+    # 4B. Generate the component-level prior Monte Carlo samples.
+    # For each component and each draw: choose a rater profile with equal weight,
+    # draw p from that profile's Beta distribution, then convert to q = 1 - p.
     rng = np.random.Generator(np.random.PCG64(seed))
     basic = sample_components(profiles, n_prior, rng)
 
-    # 5. Propagate the seven component failure probabilities through the fault tree.
+    # 5. Propagate the seven component failure-probability samples through the
+    # fault tree to create the full system prior, including q_top.
     prior = np.column_stack((basic, fault_tree_nodes(basic)))
 
-    # 6. Update the prior using top-event binomial test evidence, then resample jointly.
+    # 6A. Compare every prior q_top sample with the observed binomial test evidence.
+    # posterior_weights() assigns higher weight to prior samples that better explain
+    # the observed n_test / k_fail result; it does not yet create a new sample set.
     weights = posterior_weights(prior[:, -1], settings.n_test, settings.k_fail)
+
+    # 6B. Create posterior Monte Carlo samples by resampling complete prior rows
+    # according to those weights. Resampling whole rows preserves joint dependence.
     posterior, indices, ess = resample_joint(prior, weights, n_posterior, rng)
 
-    # 7. Compute posterior diagnostics and summarize all 11 model nodes.
+    # 7. Check and summarize the posterior already created in Step 6B.
+    # Weighted moments are a direct check; summarize_nodes() reports final statistics.
     weighted_mean, weighted_variance = weighted_moments(prior, weights)
     summary = summarize_nodes(prior, posterior, settings.q_req)
 
-    # 8. Run the legacy average-score method only for the required comparison output.
+    # 8. TEMPORARY VERIFICATION ONLY: compare the legacy average-score method
+    # with the primary exact-mixture method. These values do not affect the main
+    # prior/posterior results. Remove this comparison before official deployment.
     legacy = fault_tree_nodes(sample_averaged_scores(profiles, settings.lambda_phase, n_prior, rng))[:, -1]
     legacy_weights = posterior_weights(legacy, settings.n_test, settings.k_fail)
     legacy_post = legacy[rng.choice(n_prior, n_posterior, p=legacy_weights)]
@@ -94,16 +108,17 @@ def run_analysis(input_path: str | Path, output_dir: str | Path,
     # 9. Create a unique run folder and assemble reproducibility metadata.
     run_dir, stamp = _create_run(Path(output_dir).resolve())
 
-    def matlab_array(values: tuple) -> str:
+    def format_matlab_array(values: tuple) -> str:
+        """Format mapping values for RunInfo metadata only; no numerical role."""
         return '['+' '.join(f'{v:g}' for v in values)+']'
 
     info = dict(RunStamp=stamp, InputFile=str(input_path), OutputFolder=str(run_dir),
                 N=int(n_prior), Mpost=int(n_posterior), n_test=settings.n_test, k_fail=settings.k_fail,
                 q_req=settings.q_req, phase_name=settings.phase, lambda_phase=settings.lambda_phase,
                 InputMode="linear_pool", EffectiveSampleSize=ess, ModelVersion="13", Seed=int(seed),
-                ScoreLevels=matlab_array(SCORE_LEVELS), MuTLevels=matlab_array(MU_T_LEVELS),
-                MOLevels=matlab_array(M_O_LEVELS), SOLevels=matlab_array(S_O_LEVELS),
-                PhaseLevels=','.join(PHASES), LambdaLevels=matlab_array(tuple(PHASES.values())),
+                ScoreLevels=format_matlab_array(SCORE_LEVELS), MuTLevels=format_matlab_array(MU_T_LEVELS),
+                MOLevels=format_matlab_array(M_O_LEVELS), SOLevels=format_matlab_array(S_O_LEVELS),
+                PhaseLevels=','.join(PHASES), LambdaLevels=format_matlab_array(tuple(PHASES.values())),
                 MeanClipMin=MEAN_CLIP[0], MeanClipMax=MEAN_CLIP[1], PoolingWeights="equal_within_component",
                 NInputRows=len(cleaned), NUsedRows=int(profiles.NUsedRows.sum()),
                 NExcludedRows=len(excluded), NRaters=int(profiles.RaterID.nunique()), NProfiles=len(profiles))
