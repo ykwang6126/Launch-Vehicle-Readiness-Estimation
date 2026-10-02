@@ -49,7 +49,7 @@ def canonical_component(value: object) -> str:
     return aliases[key]
 
 
-def validate_runtime(n_prior: int, n_posterior: int, seed: int) -> None:
+def validate_run_options(n_prior: int, n_posterior: int, seed: int) -> None:
     """Check run-time Monte Carlo options before the analysis starts.
 
     This validates how the program is run, not the Excel assessment data:
