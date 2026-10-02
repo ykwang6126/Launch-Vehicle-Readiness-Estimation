@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from lvreadiness.validation import InputError, validate_input, validate_runtime
+from lvreadiness.validation import InputError, validate_input, validate_run_options
 from lvreadiness.io import read_input
 
 
@@ -70,6 +70,6 @@ def test_duplicate_headers_and_wrong_sheet(tmp_path):
 
 
 @pytest.mark.parametrize('args', [(0,10,1),(10,0,1),(2.5,10,1),(10,10,-1),(10,10,True)])
-def test_runtime(args):
+def test_run_options(args):
     with pytest.raises(InputError):
-        validate_runtime(*args)
+        validate_run_options(*args)
