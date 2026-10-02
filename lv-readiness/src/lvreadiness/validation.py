@@ -11,146 +11,221 @@ from .config import BRANCHES, COMPONENTS, PHASES, Settings
 
 
 class InputError(ValueError):
-    """Raised when run options or assessment data violate the input contract."""
+    """Custom validation error raised when user input violates the package contract.
+
+    The class does not store a list of all possible errors. Each `raise InputError(...)`
+    creates one error object carrying the specific message for that failure.
+    """
 
 
-def text(value: object) -> str:
-    """Normalize blank cells and surrounding whitespace without inventing values."""
+def normalize_text(value: object) -> str:
+    """Convert an Excel cell to clean text for comparison.
+
+    Blank/NaN cells become "". Other values become strings with leading and
+    trailing whitespace removed. This does not change the underlying meaning.
+    """
     return "" if value is None or pd.isna(value) else str(value).strip()
 
 
 def canonical_component(value: object) -> str:
-    """Map accepted component aliases to the canonical component names."""
+    """Map accepted component aliases to one canonical component name.
 
-    # Normalize capitalization/spacing, then translate approved aliases only.
-    key = re.sub(r"\s+", " ", text(value).replace("\xa0", " ")).lower()
+    Example: "Integration" and "Assembly & Integration" are normalized to
+    the package's standard name "Assembly and Integration".
+    """
+
+    # Normalize capitalization and repeated/extra spaces before alias lookup.
+    key = re.sub(r"\s+", " ", normalize_text(value).replace("\xa0", " ")).lower()
+
+    # Start with the seven official component names, then add approved aliases.
     aliases = {c.lower(): c for c in COMPONENTS}
     aliases.update({"integration": COMPONENTS[3], "assembly & integration": COMPONENTS[3],
                     "assembly/integration": COMPONENTS[3], "design concept": COMPONENTS[0],
                     "implementation verification": COMPONENTS[4], "impl verification": COMPONENTS[4],
                     "operational setup": COMPONENTS[5], "operational execution": COMPONENTS[6]})
+
     if key not in aliases:
         raise InputError(f"Unknown Component: {value!r}")
     return aliases[key]
 
 
 def validate_runtime(n_prior: int, n_posterior: int, seed: int) -> None:
-    """Validate Monte Carlo sample counts and random seed (not assessment data)."""
+    """Check run-time Monte Carlo options before the analysis starts.
 
-    # Sample counts must be positive integers; the seed may be zero or greater.
+    This validates how the program is run, not the Excel assessment data:
+    n_prior and n_posterior must be positive integer sample counts, and seed
+    must be a nonnegative integer.
+    """
+
     for key, val, lower in (("n_prior", n_prior, 1), ("n_posterior", n_posterior, 1), ("seed", seed, 0)):
         if isinstance(val, bool) or not isinstance(val, Integral) or val < lower:
             raise InputError(f"{key} must be an integer >= {lower}.")
 
 
 def validate_evidence(n: int, k: int) -> None:
-    """Validate binomial test evidence before the Bayesian update."""
+    """Check binomial test counts used by the Bayesian update.
+
+    n is the number of tests and k is the number of observed failures.
+    Valid evidence requires integer counts with 0 <= k <= n.
+    The function returns nothing; successful return simply means the values passed.
+    """
     if any(isinstance(v, bool) or not isinstance(v, Integral) for v in (n, k)) or not 0 <= k <= n:
         raise InputError("Test counts must be integers satisfying 0 <= k_fail <= n_test.")
 
 
-def validate_input(frame: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, Settings, list[int]]:
+def validate_input(raw_input: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, Settings, list[int]]:
     """Validate MATLAB_Input and build one T/O score profile per component/rater."""
 
-    # 1. Check that the required columns and one lifecycle-phase column exist.
+    # 1. Check required columns.
     required = {"Branch", "Component", "Indicator", "Cat", "Z", "RaterID", "n_test", "k_fail", "q_req"}
-    missing = required - set(frame.columns)
+    missing = required - set(raw_input.columns)
     if missing:
         raise InputError(f"MATLAB_Input missing columns: {', '.join(sorted(missing))}")
-    phase_cols = [c for c in frame.columns if re.sub(r"[ _.]", "", str(c).lower()) in
-                  ("lifecyclephase", "lifecylcephase")]
-    if len(phase_cols) != 1:
+
+    # Accept the current header plus the historical misspelling used in older workbooks.
+    phase_columns = [column for column in raw_input.columns
+                     if re.sub(r"[ _.]", "", str(column).lower()) in
+                     ("lifecyclephase", "lifecylcephase")]
+    if len(phase_columns) != 1:
         raise InputError("Exactly one Lifecycle Phase column is required.")
 
-    # 2. Require one supported lifecycle phase across the workbook.
-    phases = {text(v).upper() for v in frame[phase_cols[0]] if text(v)}
-    if len(phases) != 1 or not phases <= PHASES.keys():
+    # 2. Read the lifecycle phase.
+    # A workbook represents one lifecycle phase. The value may appear once or be
+    # repeated down the column; blanks are ignored and repeated values must agree.
+    phase_column = phase_columns[0]
+    entered_phases = [
+        normalize_text(value).upper()
+        for value in raw_input[phase_column]
+        if normalize_text(value)
+    ]
+    unique_phases = set(entered_phases)
+
+    if len(unique_phases) != 1 or not unique_phases <= PHASES.keys():
         raise InputError("Lifecycle Phase must contain one supported, consistent phase.")
+    lifecycle_phase = next(iter(unique_phases))
 
-    # Helper: settings may appear once or repeat identically down the sheet.
-    # Collect nonblank values and require exactly one consistent numeric value.
-    def scalar(name: str) -> float:
-        vals = []
-        for i, v in enumerate(frame[name], 2):
-            if text(v):
+    # Helper for n_test, k_fail, and q_req.
+    # Each setting may appear once or repeat identically down the sheet. This
+    # function ignores blanks, converts entered values to numbers, and rejects
+    # missing, nonnumeric, nonfinite, or conflicting values.
+    def read_consistent_setting(column_name: str) -> float:
+        values = []
+        for excel_row, raw_value in enumerate(raw_input[column_name], 2):
+            if normalize_text(raw_value):
                 try:
-                    number = float(v)
+                    number = float(raw_value)
                 except (ValueError, TypeError):
-                    raise InputError(f"Invalid {name} at Excel row {i}.") from None
+                    raise InputError(f"Invalid {column_name} at Excel row {excel_row}.") from None
                 if not np.isfinite(number):
-                    raise InputError(f"Nonfinite {name} at Excel row {i}.")
-                vals.append(number)
-        if not vals or len(set(vals)) != 1:
-            raise InputError(f"{name} must contain one consistent value.")
-        return vals[0]
+                    raise InputError(f"Nonfinite {column_name} at Excel row {excel_row}.")
+                values.append(number)
 
-    # 3. Validate top-event test settings and package them into Settings.
-    n, k, threshold = (scalar(c) for c in ("n_test", "k_fail", "q_req"))
-    if not n.is_integer() or not k.is_integer() or not 0 <= k <= n:
+        if not values or len(set(values)) != 1:
+            raise InputError(f"{column_name} must contain one consistent value.")
+        return values[0]
+
+    # 3. Read and validate top-event test/requirement settings.
+    n_test = read_consistent_setting("n_test")
+    k_fail = read_consistent_setting("k_fail")
+    q_req = read_consistent_setting("q_req")
+
+    if not n_test.is_integer() or not k_fail.is_integer() or not 0 <= k_fail <= n_test:
         raise InputError("Test counts must be integers satisfying 0 <= k_fail <= n_test.")
-    if not 0 <= threshold <= 1:
+    if not 0 <= q_req <= 1:
         raise InputError("q_req must lie in [0, 1].")
-    settings = Settings(next(iter(phases)), int(n), int(k), threshold)
 
-    # 4. Prepare assessment rows and preserve original Excel row numbers.
-    df = frame.copy()
-    df["SourceRow"] = np.arange(2, len(df) + 2)
-    if "Status" not in df:
-        df["Status"] = ""
+    # Keep the four workbook-level settings together so later modules can access
+    # analysis_settings.phase, .n_test, .k_fail, .q_req, and .lambda_phase.
+    analysis_settings = Settings(lifecycle_phase, int(n_test), int(k_fail), q_req)
 
-    # Ignore fully blank assessment rows but keep any row containing assessment data.
-    keep = df[["Branch", "Component", "Indicator", "Cat", "Z", "RaterID", "Status"]].apply(
-        lambda col: col.map(text).ne("")).any(axis=1)
-    df = df.loc[keep].copy()
-    if df.empty:
+    # 4. Copy the raw table before cleaning it and remember original Excel rows.
+    assessment_rows = raw_input.copy()
+
+    # Excel row 1 contains headers, so the first data row is row 2. SourceRow lets
+    # validation errors/warnings point users back to the exact row in their workbook.
+    assessment_rows["SourceRow"] = np.arange(2, len(assessment_rows) + 2)
+
+    if "Status" not in assessment_rows:
+        assessment_rows["Status"] = ""
+
+    # Ignore fully blank assessment rows but retain any row containing assessment data.
+    keep = assessment_rows[["Branch", "Component", "Indicator", "Cat", "Z", "RaterID", "Status"]].apply(
+        lambda col: col.map(normalize_text).ne("")).any(axis=1)
+    assessment_rows = assessment_rows.loc[keep].copy()
+
+    if assessment_rows.empty:
         raise InputError("MATLAB_Input has no assessment rows.")
 
-    # 5. Normalize text fields and reject missing IDs/labels needed to identify a score.
+    # 5. Normalize text fields and reject missing identifiers.
     for col in ("Branch", "Component", "Indicator", "Cat", "RaterID", "Status"):
-        df[col] = df[col].map(text)
-    for _, row in df.iterrows():
+        assessment_rows[col] = assessment_rows[col].map(normalize_text)
+
+    for _, row in assessment_rows.iterrows():
         if any(not row[c] for c in ("Branch", "Component", "Indicator", "RaterID")):
             raise InputError(f"Missing Branch, Component, Indicator or RaterID at Excel row {row.SourceRow}.")
 
-    # 6. Normalize component/category labels and validate T/O categories.
-    df["Component"] = df.Component.map(canonical_component)
-    df["Cat"] = df.Cat.str.upper()
-    bad_cat = ~df.Cat.isin(["T", "O"])
+    # 6. Normalize component names and T/O category labels.
+    assessment_rows["Component"] = assessment_rows.Component.map(canonical_component)
+    assessment_rows["Cat"] = assessment_rows.Cat.str.upper()  # "o" -> "O" (letter O), not zero.
+    bad_cat = ~assessment_rows.Cat.isin(["T", "O"])
+
     if bad_cat.any():
-        raise InputError(f"Invalid Cat at Excel rows {df.loc[bad_cat, 'SourceRow'].tolist()}.")
+        raise InputError(f"Invalid Cat at Excel rows {assessment_rows.loc[bad_cat, 'SourceRow'].tolist()}.")
 
     # 7. Handle "Unable to assess" and validate all remaining 0-4 scores.
-    df["Unassessed"] = df.Status.str.casefold().eq("unable to assess")
-    if (df.Unassessed & df.Z.map(text).ne("")).any():
+    assessment_rows["Unassessed"] = assessment_rows.Status.str.casefold().eq("unable to assess")
+
+    if (assessment_rows.Unassessed & assessment_rows.Z.map(normalize_text).ne("")).any():
         raise InputError("Rows marked Unable to assess must have blank Z.")
-    df["Z"] = pd.to_numeric(df.Z, errors="coerce")
-    bad = ~df.Unassessed & (~np.isfinite(df.Z) | ~df.Z.between(0, 4))
-    if bad.any():
-        raise InputError(f"Invalid Z at Excel rows {df.loc[bad, 'SourceRow'].tolist()}.")
+
+    assessment_rows["Z"] = pd.to_numeric(assessment_rows.Z, errors="coerce")
+    bad_score = ~assessment_rows.Unassessed & (
+        ~np.isfinite(assessment_rows.Z) | ~assessment_rows.Z.between(0, 4)
+    )
+
+    if bad_score.any():
+        raise InputError(f"Invalid Z at Excel rows {assessment_rows.loc[bad_score, 'SourceRow'].tolist()}.")
 
     # 8. Build one profile per (Component, RaterID).
-    # Within each profile, average retained T scores and O scores separately.
-    # Each profile must retain at least one scored T indicator and one scored O indicator.
-    profiles = []
-    excluded = df.loc[df.Unassessed, "SourceRow"].astype(int).tolist()
-    for component, branch in zip(COMPONENTS, BRANCHES):
-        group = df.loc[df.Component.eq(component)]
-        if group.empty:
-            raise InputError(f"Missing required component: {component}.")
-        if not group.Branch.str.casefold().eq(branch.casefold()).all():
-            raise InputError(f"Wrong Branch for {component}.")
-        for rater, rows in group.groupby("RaterID", sort=False):
-            if rows.Indicator.str.casefold().duplicated().any():
-                raise InputError(f"Duplicate indicator within {component} / {rater}.")
-            used = rows.loc[~rows.Unassessed]
-            if set(used.Cat) != {"T", "O"}:
-                raise InputError(f"{component} / {rater} needs at least one scored T and O indicator.")
-            profiles.append(dict(Branch=branch, Component=component, RaterID=rater,
-                                 Z_T=float(used.loc[used.Cat.eq('T'), 'Z'].mean()),
-                                 Z_O=float(used.loc[used.Cat.eq('O'), 'Z'].mean()),
-                                 NInputRows=len(rows), NUsedRows=len(used), NExcludedRows=len(rows)-len(used)))
+    # zip(COMPONENTS, BRANCHES) walks the matched component/branch pairs together.
+    # groupby("RaterID") then separates that component's rows by individual rater.
+    # Within each rater profile, retained T scores and O scores are averaged separately.
+    rater_profiles = []
+    excluded_rows = assessment_rows.loc[assessment_rows.Unassessed, "SourceRow"].astype(int).tolist()
 
-    # 9. Report exclusions and return both cleaned rows and profile-level model inputs.
-    if excluded:
-        warnings.warn(f"Excluded Unable to assess indicators at Excel rows {excluded}.", UserWarning, stacklevel=2)
-    return df, pd.DataFrame(profiles), settings, excluded
+    for component, expected_branch in zip(COMPONENTS, BRANCHES):
+        component_rows = assessment_rows.loc[assessment_rows.Component.eq(component)]
+
+        if component_rows.empty:
+            raise InputError(f"Missing required component: {component}.")
+        if not component_rows.Branch.str.casefold().eq(expected_branch.casefold()).all():
+            raise InputError(f"Wrong Branch for {component}.")
+
+        for rater_id, rater_rows in component_rows.groupby("RaterID", sort=False):
+            if rater_rows.Indicator.str.casefold().duplicated().any():
+                raise InputError(f"Duplicate indicator within {component} / {rater_id}.")
+
+            scored_rows = rater_rows.loc[~rater_rows.Unassessed]
+            if set(scored_rows.Cat) != {"T", "O"}:
+                raise InputError(f"{component} / {rater_id} needs at least one scored T and O indicator.")
+
+            rater_profiles.append(dict(
+                Branch=expected_branch,
+                Component=component,
+                RaterID=rater_id,
+                Z_T=float(scored_rows.loc[scored_rows.Cat.eq("T"), "Z"].mean()),
+                Z_O=float(scored_rows.loc[scored_rows.Cat.eq("O"), "Z"].mean()),
+                NInputRows=len(rater_rows),
+                NUsedRows=len(scored_rows),
+                NExcludedRows=len(rater_rows) - len(scored_rows),
+            ))
+
+    # 9. Report excluded "Unable to assess" rows and return validated model inputs.
+    if excluded_rows:
+        warnings.warn(
+            f"Excluded Unable to assess indicators at Excel rows {excluded_rows}.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    return assessment_rows, pd.DataFrame(rater_profiles), analysis_settings, excluded_rows
