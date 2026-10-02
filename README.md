@@ -5,14 +5,22 @@ Beta priors, pools raters equally, propagates a seven-component fault tree, and
 updates joint samples with top-event binomial test evidence. This is the Python
 implementation of specification v0.1 revision 3 and MATLAB v13.
 
+## Citation
+
+If you use LVReadiness, please cite the software repository:
+
+**Wang, Yu-Kai. (2026). _LVReadiness: Probabilistic Launch Vehicle Readiness and Mission-Success Assessment_ (Version 0.1.0). GitHub.**
+
+GitHub's **Cite this repository** feature uses `CITATION.cff`. A preferred
+citation to the associated SciTech paper will be added when that publication
+becomes publicly available.
+
 ## Install and run on Windows
 
 Target repository: [ykwang6126/Launch-Vehicle-Readiness-Estimation](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation).
 
-Requires Python 3.10 or later. Open **Terminal > New Terminal** in VS Code and
-select PowerShell. Navigate to the package folder containing `pyproject.toml`
-and this README. If the repository contains this package in a subfolder, enter
-that subfolder first.
+Requires Python 3.10 or later. Open **Terminal > New Terminal** in VS Code,
+select PowerShell, and run the following commands from the repository root.
 
 Create your own local environment and install the package and test dependencies:
 
@@ -57,20 +65,6 @@ running. See [input and output requirements](docs/input_output.md). The historic
 regression test skips when its restricted workbook is unavailable; the public
 unit and integration tests use synthetic data.
 
-### Existing research workspace
-
-If you already use the enclosing `Python` research folder with `.venv`,
-`run_lvreadiness.py`, `Inputs_sheet.xlsx`, and `lv-readiness/` beside each other,
-run the following **from that enclosing folder**:
-
-```powershell
-.\.venv\Scripts\python.exe run_lvreadiness.py run Inputs_sheet.xlsx --output outputs/python --seed 1
-.\.venv\Scripts\python.exe -m pytest lv-readiness/tests -q
-```
-
-The launcher and historical workbook are local conveniences. They are not needed
-to run the installed package from a GitHub checkout.
-
 ## Python interface
 
 ```python
@@ -104,7 +98,8 @@ schemas, and [source decisions](docs/project_spec.md) for document discrepancies
 ## Data and publication
 
 The example workbook is synthetic. Historical assessments and derived local
-results must not be published. Ignore rules are provided, but do not remove
-files already tracked by another repository. No remote changes are made by this
-package. The research authors must approve publication rights and choose an
-open-source license before public release; no license grant is presumed here.
+results are not distributed. Project-specific ignore rules help keep local
+assessment and output artifacts out of version control.
+
+This repository currently has no open-source license. Licensing and IP ownership
+are under review; public visibility does not itself grant an open-source license.
