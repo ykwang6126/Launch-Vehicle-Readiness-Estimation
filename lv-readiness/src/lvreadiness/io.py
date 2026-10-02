@@ -37,23 +37,29 @@ def read_input(path: str | Path) -> pd.DataFrame:
         if len([h for h in headers if h is not None]) != len(set(h for h in headers if h is not None)):
             raise InputError("MATLAB_Input has duplicate column names.")
 
-        # 5. Return raw worksheet values; validation.py performs model/data checks.
-        frame = pd.DataFrame(rows[1:], columns=headers)
-        return frame.loc[:, [c is not None for c in frame.columns]]
+        # 5. Convert raw worksheet rows into a pandas table for validation.py.
+        raw_input = pd.DataFrame(rows[1:], columns=headers)
+        return raw_input.loc[:, [c is not None for c in raw_input.columns]]
     finally:
         book.close()
 
 
 def sha256(path: str | Path) -> str:
-    """Fingerprint the exact input file so a run can be traced to its source."""
+    """Create a SHA-256 fingerprint of the exact input file for traceability."""
+
+    # The fingerprint is saved in run_metadata.json. Recomputing SHA-256 later
+    # lets us verify whether an Excel input file is exactly the same file used
+    # for the original run. Any file change will produce a different hash.
     with Path(path).open("rb") as source:
         return hashlib.file_digest(source, "sha256").hexdigest() if hasattr(hashlib, 'file_digest') else hashlib.sha256(source.read()).hexdigest()
 
 
 def git_commit(path: Path) -> str | None:
-    """Record the current Git commit in run metadata when Git is available."""
+    """Record the current Git commit so a run can be traced to a code version."""
 
-    # This is provenance only; it does not affect the numerical analysis.
+    # The commit SHA is saved in run_metadata.json. It can be used to open the
+    # exact committed version of the code on GitHub. This is provenance only
+    # and does not affect the numerical analysis.
     git = shutil.which("git")
     if git is None:
         return None
