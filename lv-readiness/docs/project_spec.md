@@ -5,13 +5,12 @@ version 0.1 specification revision 3, revised September 18, 2026, prepared by
 Yu-Kai Wang. MATLAB implementation reference: `mc_faulttree_bayes_demo_v13.m`.
 The original files remain in the enclosing research workspace.
 
-Mathematical reference supplied in this workspace: Wang and Marais,
-*An Adaptive Probabilistic Framework to Support Mission Success Assessment in
-Launch Vehicle Development*, `Wang_AIAA_SciTech2027_Abstract_20260521.pdf`.
-The supplied PDF filename differs from the abstract v6 DOCX cited by the spec;
-this implementation checked the actual supplied PDF, especially pages 4–10,
-equations 1–22, and mapping Tables 4–5. No claim is made that the two paper
-versions are identical.
+The mathematical framework was developed by Yu-Kai Wang and Karen Marais for an
+associated SciTech manuscript, *An Adaptive Probabilistic Framework to Support
+Mission Success Assessment in Launch Vehicle Development*. The manuscript is not
+yet publicly available. Until a public paper citation/DOI is available, users
+should cite this software repository using `CITATION.cff`. The implementation
+was checked against the internal manuscript version used during development.
 
 Indicator reference: `Indicators_Definition_v2.xlsx`, seven component worksheets.
 Overview labels define current assessment terminology; detailed rubrics explain
