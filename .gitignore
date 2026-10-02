@@ -216,3 +216,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# LVReadiness local/restricted artifacts
+/outputs/
+/Inputs_sheet.xlsx
+/run_lvreadiness.py
+/joint_samples.mat
+/matlab_environment.json
+/matlab_parity_report.json
+/source_manifest.json
