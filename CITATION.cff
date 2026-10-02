@@ -1,5 +1,11 @@
 cff-version: 1.2.0
-message: "For the mathematical framework, cite the Wang and Marais manuscript described in docs/project_spec.md. Release citation metadata should be confirmed by the research authors before publication."
-title: "LVReadiness Python package"
+message: "If you use this software, please cite this repository using the metadata below. A preferred paper citation will be added when the associated SciTech publication becomes publicly available."
+title: "LVReadiness: Probabilistic Launch Vehicle Readiness and Mission-Success Assessment"
 type: software
 version: 0.1.0
+date-released: 2026-10-02
+authors:
+  - family-names: "Wang"
+    given-names: "Yu-Kai"
+    affiliation: "Purdue University"
+repository-code: "https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation"
