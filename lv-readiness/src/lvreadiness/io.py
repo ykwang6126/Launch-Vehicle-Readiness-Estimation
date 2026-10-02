@@ -58,8 +58,7 @@ def git_commit(path: Path) -> str | None:
     """Record the current Git commit so a run can be traced to a code version."""
 
     # The commit SHA is saved in run_metadata.json. It can be used to open the
-    # exact committed version of the code on GitHub. This is provenance only
-    # and does not affect the numerical analysis.
+    # exact committed version of the code on GitHub.
     git = shutil.which("git")
     if git is None:
         return None
