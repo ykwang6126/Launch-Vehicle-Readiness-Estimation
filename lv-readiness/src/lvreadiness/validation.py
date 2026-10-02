@@ -18,8 +18,8 @@ class InputError(ValueError):
     """
 
 
-def normalize_text(value: object) -> str:
-    """Convert an Excel cell to clean text for comparison.
+def clean_text(value: object) -> str:
+    """Clean an Excel cell for consistent text comparison.
 
     Blank/NaN cells become "". Other values become strings with leading and
     trailing whitespace removed. This does not change the underlying meaning.
@@ -27,15 +27,15 @@ def normalize_text(value: object) -> str:
     return "" if value is None or pd.isna(value) else str(value).strip()
 
 
-def canonical_component(value: object) -> str:
-    """Map accepted component aliases to one canonical component name.
+def standardize_component_name(value: object) -> str:
+    """Map accepted component aliases to the package's standard component name.
 
     Example: "Integration" and "Assembly & Integration" are normalized to
     the package's standard name "Assembly and Integration".
     """
 
     # Normalize capitalization and repeated/extra spaces before alias lookup.
-    key = re.sub(r"\s+", " ", normalize_text(value).replace("\xa0", " ")).lower()
+    key = re.sub(r"\s+", " ", clean_text(value).replace("\xa0", " ")).lower()
 
     # Start with the seven official component names, then add approved aliases.
     aliases = {c.lower(): c for c in COMPONENTS}
@@ -94,15 +94,15 @@ def validate_input(raw_input: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame,
     # repeated down the column; blanks are ignored and repeated values must agree.
     phase_column = phase_columns[0]
     entered_phases = [
-        normalize_text(value).upper()
+        clean_text(value).upper()
         for value in raw_input[phase_column]
-        if normalize_text(value)
+        if clean_text(value)
     ]
     unique_phases = set(entered_phases)
 
     if len(unique_phases) != 1 or not unique_phases <= PHASES.keys():
         raise InputError("Lifecycle Phase must contain one supported, consistent phase.")
-    lifecycle_phase = next(iter(unique_phases))
+    lifecycle_phase = entered_phases[0]  # safe because the check above guarantees one unique value
 
     # Helper for n_test, k_fail, and q_req.
     # Each setting may appear once or repeat identically down the sheet. This
@@ -111,7 +111,7 @@ def validate_input(raw_input: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame,
     def read_consistent_setting(column_name: str) -> float:
         values = []
         for excel_row, raw_value in enumerate(raw_input[column_name], 2):
-            if normalize_text(raw_value):
+            if clean_text(raw_value):
                 try:
                     number = float(raw_value)
                 except (ValueError, TypeError):
@@ -150,7 +150,7 @@ def validate_input(raw_input: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame,
 
     # Ignore fully blank assessment rows but retain any row containing assessment data.
     keep = assessment_rows[["Branch", "Component", "Indicator", "Cat", "Z", "RaterID", "Status"]].apply(
-        lambda col: col.map(normalize_text).ne("")).any(axis=1)
+        lambda col: col.map(clean_text).ne("")).any(axis=1)
     assessment_rows = assessment_rows.loc[keep].copy()
 
     if assessment_rows.empty:
@@ -158,14 +158,14 @@ def validate_input(raw_input: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame,
 
     # 5. Normalize text fields and reject missing identifiers.
     for col in ("Branch", "Component", "Indicator", "Cat", "RaterID", "Status"):
-        assessment_rows[col] = assessment_rows[col].map(normalize_text)
+        assessment_rows[col] = assessment_rows[col].map(clean_text)
 
     for _, row in assessment_rows.iterrows():
         if any(not row[c] for c in ("Branch", "Component", "Indicator", "RaterID")):
             raise InputError(f"Missing Branch, Component, Indicator or RaterID at Excel row {row.SourceRow}.")
 
     # 6. Normalize component names and T/O category labels.
-    assessment_rows["Component"] = assessment_rows.Component.map(canonical_component)
+    assessment_rows["Component"] = assessment_rows.Component.map(standardize_component_name)
     assessment_rows["Cat"] = assessment_rows.Cat.str.upper()  # "o" -> "O" (letter O), not zero.
     bad_cat = ~assessment_rows.Cat.isin(["T", "O"])
 
@@ -175,7 +175,7 @@ def validate_input(raw_input: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame,
     # 7. Handle "Unable to assess" and validate all remaining 0-4 scores.
     assessment_rows["Unassessed"] = assessment_rows.Status.str.casefold().eq("unable to assess")
 
-    if (assessment_rows.Unassessed & assessment_rows.Z.map(normalize_text).ne("")).any():
+    if (assessment_rows.Unassessed & assessment_rows.Z.map(clean_text).ne("")).any():
         raise InputError("Rows marked Unable to assess must have blank Z.")
 
     assessment_rows["Z"] = pd.to_numeric(assessment_rows.Z, errors="coerce")
