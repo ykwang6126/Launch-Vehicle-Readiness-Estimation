@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite this repository using the metadata below. A preferred paper citation will be added when the associated SciTech publication becomes publicly available."
+title: "LVReadiness: Probabilistic Launch Vehicle Readiness and Mission-Success Assessment"
+type: software
+version: 0.1.0
+date-released: 2026-10-02
+authors:
+  - family-names: "Wang"
+    given-names: "Yu-Kai"
+    affiliation: "Purdue University"
+repository-code: "https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation"
