@@ -1,10 +1,26 @@
 # Mathematical model
 
-For each component–rater profile, compute independent arithmetic means Z_T and
-Z_O over scored technical and organizational indicators. Interpolate linearly
-at these unrounded means using:
+`p` denotes success probability and `q = 1 - p` failure probability.
+Each component–rater pair has its own prior. Raters are pooled within a component;
+components are then combined into the system model.
 
-| Score | mu_T | m_O | s_O |
+## 1. Average indicators within each rater profile
+
+For scored technical (T) and organizational (O) indicators:
+
+$$
+Z_T = \frac{1}{N_T}\sum_{j=1}^{N_T} Z_{T,j}, \qquad
+Z_O = \frac{1}{N_O}\sum_{j=1}^{N_O} Z_{O,j}.
+$$
+
+Require at least one scored indicator in each category. Exclude “Unable to
+assess” rows. Keep fractional averages without rounding.
+
+## 2. Map scores to a Beta prior
+
+Interpolate linearly between these lookup values:
+
+| Score | Technical mean $\mu_T$ | Organizational factor $m_O$ | Base strength $s_O$ |
 | --- | --- | --- | --- |
 | 0 | 0.40 | 0.90 | 4 |
 | 1 | 0.60 | 0.99 | 8 |
@@ -12,47 +28,140 @@ at these unrounded means using:
 | 3 | 0.88 | 1.07 | 16 |
 | 4 | 0.96 | 1.10 | 20 |
 
-Phase factors are SFR 0.7, PDR 1.0, CDR 1.3, TRR 1.6, SVR 2.0.
-Set mu = clip(mu_T m_O, 0.01, 0.99), s = s_O lambda_phase,
-alpha_p = mu s, beta_p = (1-mu)s. Sample success p from Beta(alpha_p,beta_p)
-and failure q = 1-p. There is no additional rater adjustment or strength floor.
+| Lifecycle phase | SFR | PDR | CDR | TRR | SVR |
+| --- | --- | --- | --- | --- | --- |
+| Strength factor $\lambda$ | 0.7 | 1.0 | 1.3 | 1.6 | 2.0 |
 
-For R profiles in one component, each weight is 1/R. Draw a profile first and
-then draw its Beta. The exact mixture is not replaced by a fitted Beta.
-Pool mean is sum(w_r mu_r). Within variance is sum(w_r mu_r(1-mu_r)/(s_r+1));
-between variance is sum(w_r (mu_r-pool_mean)^2). Total variance is their sum.
-Reporting-only moment matching uses s_MM = mean(1-mean)/variance - 1.
+$$
+\mu = \min(0.99,\max(0.01,\mu_T m_O)), \qquad s = s_O\lambda.
+$$
 
-Basic event order is C, Vd, M, I, Vi, S, E. The failure tree is:
+$$
+\alpha_p = \mu s, \qquad \beta_p = (1-\mu)s, \qquad
+p \sim \operatorname{Beta}(\alpha_p,\beta_p).
+$$
 
-```
-q_design = 1 - (1-q_C)(1-q_Vd)
-q_implementation = 1 - (1-q_M)(1-q_I)(1-q_Vi)
-q_operation = 1 - (1-q_S)(1-q_E)
-q_top = 1 - (1-q_design)(1-q_implementation)(1-q_operation)
-```
+`mu` is the prior success mean; `strength` ($s$) controls its spread.
+There is no confidence multiplier, extra rater weight, or strength floor.
 
-These product rules assume independent component priors. Common causes and
-cross-component prior dependence are outside v0.1. Updating can induce dependence;
-one common posterior index vector is therefore applied to all eleven nodes.
+**Example:** $Z_T=3$, $Z_O=2.5$, CDR gives $\mu=0.924$, $s=18.2$,
+$\alpha_p=16.8168$, and $\beta_p=1.3832$.
 
-For n independent comparable trials and k failures, sample likelihood is
-L_i proportional to q_i^k (1-q_i)^(n-k). Compute log L only for nonzero
-exponents, subtract its maximum, exponentiate, and normalize. The common
-binomial coefficient cancels. Zero support is an error. n=0 gives uniform
-weights, but posterior resampling can still introduce MC noise.
+## 3. Pool raters equally within each component
 
-ESS = 1/sum(w_i^2); warn below 0.01 N. Weighted mean and variance are computed
-before resampling as a separate diagnostic. Exported summaries use the posterior
-resample to match MATLAB. Standard deviations use population normalization.
-MATLAB R2024b percentiles use midpoint plotting positions (Hazen/type 5), matched
-by NumPy quantile(method="hazen"), not NumPy's default quantile convention.
+For $R$ profiles, assign $w_r=1/R$ and retain the full mixture:
 
-Pmeet = P(q_top <= q_req), Pexc = P(q_top > q_req). These describe confidence
-in meeting a failure-rate requirement. They are not the predictive success
-probability, which is 1-E[q_top]. Pmeet/Pexc are blank for all other nodes.
+$$
+f(p)=\sum_{r=1}^{R} w_r\,\operatorname{Beta}(p;\alpha_{p,r},\beta_{p,r}).
+$$
 
-For independent components, exact success-product moments are products of
-mixture-weighted Beta moments. Let m_r = E[P_top^r]. The historical n=3,k=1
-case has prior mean 1-m_1 and posterior mean
-(m_2-2m_3+m_4)/(m_2-m_3). This avoids relying on an MC seed for validation.
+Sampling selects a rater profile, draws from its Beta, and converts to $q=1-p$.
+More indicators do not give a rater more weight.
+
+$$
+\bar\mu=\sum_r w_r\mu_r.
+$$
+
+$$
+V_{\mathrm{within}}=\sum_r w_r\frac{\mu_r(1-\mu_r)}{s_r+1}, \qquad
+V_{\mathrm{between}}=\sum_r w_r(\mu_r-\bar\mu)^2.
+$$
+
+$$
+V_{\mathrm{pool}}=V_{\mathrm{within}}+V_{\mathrm{between}}.
+$$
+
+Within variance describes individual rater uncertainty; between variance
+captures disagreement. A single moment-matched Beta is shown for comparison:
+
+$$
+s_{\mathrm{MM}}=\frac{\bar\mu(1-\bar\mu)}{V_{\mathrm{pool}}}-1.
+$$
+
+Its parameters are $\bar\mu s_{\mathrm{MM}}$ and $(1-\bar\mu)s_{\mathrm{MM}}$.
+It does not replace the mixture in sampling.
+
+## 4. Combine components through the fault tree
+
+| Symbol | Component |
+| --- | --- |
+| $q_C$ | Concept |
+| $q_{Vd}$ | Design Verification |
+| $q_M$ | Manufacturing |
+| $q_I$ | Assembly and Integration |
+| $q_{Vi}$ | Impl. Verification |
+| $q_S$ | Operation Setup |
+| $q_E$ | Operation Execution |
+
+$$
+\begin{aligned}
+q_{\mathrm{dsgn}} &= 1-(1-q_C)(1-q_{Vd}),\\
+q_{\mathrm{impl}} &= 1-(1-q_M)(1-q_I)(1-q_{Vi}),\\
+q_{\mathrm{op}} &= 1-(1-q_S)(1-q_E),\\
+q_{\mathrm{top}} &= 1-(1-q_{\mathrm{dsgn}})(1-q_{\mathrm{impl}})(1-q_{\mathrm{op}}).
+\end{aligned}
+$$
+
+The prior model assumes independent components. Common causes and prior
+cross-component dependence are outside v0.1.
+
+## 5. Update with system-level test evidence
+
+For $n$ independent comparable tests and $k$ failures, prior draw $i$ receives:
+
+$$
+L_i \propto q_{\mathrm{top},i}^{k}(1-q_{\mathrm{top},i})^{n-k}, \qquad
+\widetilde w_i=\frac{L_i}{\sum_j L_j}.
+$$
+
+The common binomial coefficient cancels. The implementation uses log likelihoods,
+skips zero exponents at endpoints, and rejects evidence supported by no draws.
+With $n=0$, weights are uniform.
+
+Resample **complete rows** using $\widetilde w_i$. Updating can induce dependence
+between components, so all eleven nodes must share the same selected row index.
+
+$$
+\mathrm{ESS}=\frac{1}{\sum_i\widetilde w_i^2}.
+$$
+
+Warn when ESS is below 1% of prior draws. Direct weighted moments provide a check;
+exported node summaries use the posterior resample and include its sampling noise.
+
+## 6. Interpret results
+
+$$
+P_{\mathrm{meet}}=P(q_{\mathrm{top}}\le q_{\mathrm{req}}), \qquad
+P_{\mathrm{exc}}=P(q_{\mathrm{top}}>q_{\mathrm{req}}).
+$$
+
+These quantify confidence in meeting the failure-probability requirement.
+Estimated mission success is a different quantity:
+
+$$
+E[p_{\mathrm{top}}]=1-E[q_{\mathrm{top}}].
+$$
+
+Summaries use population standard deviations and Hazen percentiles to match
+MATLAB v13. Threshold statistics are reported only for the top event.
+
+## Exact moments for verification
+
+Let $M_j=E[p_{\mathrm{top}}^j]$. Independence gives:
+
+$$
+M_j=\prod_{c=1}^{7}\left[
+\sum_{r=1}^{R_c}w_{c,r}\prod_{\ell=0}^{j-1}
+\frac{\alpha_{c,r}+\ell}{\alpha_{c,r}+\beta_{c,r}+\ell}
+\right], \qquad M_0=1.
+$$
+
+For the reference case $n=3$, $k=1$:
+
+$$
+E[q_{\mathrm{top}}]=1-M_1, \qquad
+E[q_{\mathrm{top}}\mid k=1,n=3]=\frac{M_2-2M_3+M_4}{M_2-M_3}.
+$$
+
+These checks do not depend on a particular random seed. The score mappings remain
+model assumptions; implementation verification does not establish predictive calibration.

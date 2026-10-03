@@ -23,25 +23,27 @@ def read_input(path: str | Path) -> pd.DataFrame:
 
     # 2. Open Excel in read-only/data-only mode.
     # data_only=True reads stored cell values rather than spreadsheet formulas.
-    book = load_workbook(path, read_only=True, data_only=True)
+    workbook = load_workbook(path, read_only=True, data_only=True)
     try:
         # 3. Read only the required MATLAB_Input worksheet.
-        if "MATLAB_Input" not in book.sheetnames:
+        if "MATLAB_Input" not in workbook.sheetnames:
             raise InputError("Required worksheet MATLAB_Input is missing.")
-        rows = list(book["MATLAB_Input"].values)
+        rows = list(workbook["MATLAB_Input"].values)
         if not rows:
             raise InputError("MATLAB_Input is empty.")
 
         # 4. Use the first row as column headers and reject duplicate names.
         headers = list(rows[0])
-        if len([h for h in headers if h is not None]) != len(set(h for h in headers if h is not None)):
+        if len([h for h in headers if h is not None]) != len(
+            set(h for h in headers if h is not None)
+        ):
             raise InputError("MATLAB_Input has duplicate column names.")
 
         # 5. Convert raw worksheet rows into a pandas table for validation.py.
         raw_input = pd.DataFrame(rows[1:], columns=headers)
         return raw_input.loc[:, [c is not None for c in raw_input.columns]]
     finally:
-        book.close()
+        workbook.close()
 
 
 def sha256(path: str | Path) -> str:
@@ -51,7 +53,11 @@ def sha256(path: str | Path) -> str:
     # lets us verify whether an Excel input file is exactly the same file used
     # for the original run. Any file change will produce a different hash.
     with Path(path).open("rb") as source:
-        return hashlib.file_digest(source, "sha256").hexdigest() if hasattr(hashlib, 'file_digest') else hashlib.sha256(source.read()).hexdigest()
+        return (
+            hashlib.file_digest(source, "sha256").hexdigest()
+            if hasattr(hashlib, "file_digest")
+            else hashlib.sha256(source.read()).hexdigest()
+        )
 
 
 def git_commit(path: Path) -> str | None:
@@ -59,18 +65,25 @@ def git_commit(path: Path) -> str | None:
 
     # The commit SHA is saved in run_metadata.json. It can be used to open the
     # exact committed version of the code on GitHub.
-    git = shutil.which("git")
-    if git is None:
+    git_executable = shutil.which("git")
+    if git_executable is None:
         return None
     try:
-        proc = subprocess.run([git, "-C", str(path), "rev-parse", "HEAD"],
-                              capture_output=True, text=True, timeout=5, check=False)
-        return proc.stdout.strip() if proc.returncode == 0 else None
+        completed = subprocess.run(
+            [git_executable, "-C", str(path), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        return completed.stdout.strip() if completed.returncode == 0 else None
     except (OSError, subprocess.TimeoutExpired):
         return None
 
 
-def export_results(run_dir: Path, tables: dict[str, pd.DataFrame], config: dict, metadata: dict) -> dict[str, Path]:
+def export_results(
+    run_dir: Path, tables: dict[str, pd.DataFrame], config: dict, metadata: dict
+) -> dict[str, Path]:
     """Write the analysis tables and reproducibility files for one run."""
 
     # 1. Export all result tables into the required results.xlsx worksheets.
@@ -81,15 +94,27 @@ def export_results(run_dir: Path, tables: dict[str, pd.DataFrame], config: dict,
 
             # Keep text labels as literal strings, even when an ID begins with "=".
             sheet = writer.sheets[name]
-            for row_index, values in enumerate(table.itertuples(index=False, name=None), 2):
+            for row_index, values in enumerate(
+                table.itertuples(index=False, name=None), 2
+            ):
                 for col_index, value in enumerate(values, 1):
                     if isinstance(value, str):
                         sheet.cell(row_index, col_index).data_type = "s"
 
     # 2. Save the resolved run configuration and provenance metadata separately.
-    config_path, metadata_path = run_dir / "run_config.yaml", run_dir / "run_metadata.json"
+    config_path, metadata_path = (
+        run_dir / "run_config.yaml",
+        run_dir / "run_metadata.json",
+    )
     config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
-    metadata_path.write_text(json.dumps(metadata, indent=2, allow_nan=False)+"\n", encoding="utf-8")
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2, allow_nan=False) + "\n", encoding="utf-8"
+    )
 
     # 3. Return paths so pipeline.py/other Python code can access the outputs.
-    return dict(results=workbook, config=config_path, metadata=metadata_path, figures=run_dir/"figures")
+    return dict(
+        results=workbook,
+        config=config_path,
+        metadata=metadata_path,
+        figures=run_dir / "figures",
+    )

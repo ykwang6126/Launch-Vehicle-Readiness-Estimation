@@ -1,25 +1,42 @@
-# Architecture
+# Processing workflow
 
-The public run_analysis function and CLI both call pipeline.py. config.py owns
-constants and defaults. io.py reads one worksheet, validates duplicate headers,
-and exports tables and provenance. validation.py enforces settings, row, and
-profile constraints. priors.py computes success-space parameters. pooling.py
-provides exact mixture moments and sampling. fault_tree.py owns tree equations.
-updating.py owns log-space weights, ESS, weighted moments, and joint resampling.
-summary.py owns statistics. plotting.py writes the twelve diagnostic PNG files
-without opening interactive windows.
+1. Read the workbook's `MATLAB_Input` sheet and check headers.
+2. Validate settings and assessment rows. Keep original Excel row numbers for errors.
+3. Group by component and rater. Average scored T and O indicators separately.
+4. Map each profile to a success-Beta prior. Give raters equal weight within each component.
+5. Sample each component mixture, convert success `p` to failure `q`, and evaluate the fault tree.
+6. Weight complete prior rows using the system test likelihood; resample rows to form the posterior.
+7. Summarize nodes, create comparison plots, and export results to a new run folder.
 
-One NumPy Generator(PCG64(seed)) is passed through numerical functions. Profile
-order is stable within the fixed component order. Only sampling consumes RNG
-state; plotting, reporting, and validation do not. Basic prior samples, all node
-samples, weights, and posterior indices are available on AnalysisResult.
+## What calls what
 
-Paths are supplied at runtime. Historical inputs are outside the package.
-Package installation does not require MATLAB. MATLAB is needed only to regenerate
-native regression references using tools/export_matlab_reference.m. The replay
-verifier reads those native arrays; normal Python runs never import MATLAB results.
+Both `python -m lvreadiness` and the Python API call `run_analysis` in
+[`pipeline.py`](../src/pipeline.py). See the [source guide](../src/README.md)
+for each module's responsibility.
 
-Unit tests exercise mathematics and invalid inputs; integration tests exercise
-the API, CLI, exports, and repeatability. Historical regression runs locally when
-the restricted workbook is available and otherwise skips. Synthetic inputs are
-distributed so public unit/integration tests do not require restricted data.
+`AnalysisResult` contains:
+
+| Field | Contents |
+| --- | --- |
+| `tables`, `paths` | Exported tables and output file paths |
+| `prior_samples`, `posterior_samples` | Draws for seven basic events and four combined nodes |
+| `posterior_weights` | One likelihood weight per prior row |
+| `posterior_indices` | Prior row indices selected for posterior draws |
+| `weighted_mean`, `weighted_variance` | Direct posterior diagnostics before resampling |
+
+## Reproducibility
+
+- One seeded NumPy `PCG64` generator supplies all random draws.
+- Component order is fixed; rater order follows input appearance within each component.
+- Validation, statistics, and plotting do not consume random draws.
+- The average-score comparison runs after the main posterior and does not change it.
+- Repeated runs match numerically in the same dependency environment. Run paths and timestamps differ.
+
+## Installation and layout
+
+`src` is mapped to the installed package name `lvreadiness` in `pyproject.toml`.
+No source subfolder or import shim is required. Install the package before running
+tests or helper scripts; placing `src` on `PYTHONPATH` alone is insufficient.
+
+MATLAB is used only for optional reference generation. Python never needs
+restricted historical data for its public tests.

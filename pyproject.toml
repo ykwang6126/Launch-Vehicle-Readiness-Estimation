@@ -15,9 +15,10 @@ test = ["pytest>=8"]
 [project.scripts]
 lvreadiness = "lvreadiness.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+# Source files live directly in src; installation exposes them as lvreadiness.
+[tool.setuptools]
+packages = ["lvreadiness"]
+package-dir = {lvreadiness = "src"}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]

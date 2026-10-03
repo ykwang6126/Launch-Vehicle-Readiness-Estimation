@@ -1,86 +1,104 @@
-# Verification report
+# Verification
 
-Executed September 22, 2026 on Windows, MATLAB R2024b and Python 3.12.
-Python dependency versions are pinned in requirements-verified.txt. The package
-installed successfully into a new workspace .venv using pip editable installation.
-The complete unit, integration, and available historical regression suite passed:
-**34 passed**. Tests include API/CLI equivalence, repeated-run exact numerical
-reproducibility, exports, invalid inputs, mixture moments, analytical baselines,
-endpoint likelihoods, large test counts, ESS warnings, and joint resampling.
+## Current audit — October 3, 2026
 
-## Native reference and independent Python run
+The public suite passed **33 tests, with 1 skipped** in both the editable
+installation and the built wheel tested outside the repository. The skip is the
+restricted historical-workbook test.
 
-The original MATLAB v13 source was not modified. The wrapper
-tools/export_matlab_reference.m reran it and saved joint draws and native runtime
-metadata. Recorded local reference: `../../outputs/run_20260922_161750_933`.
-Recorded Python run: `../../outputs/python/run_20260922_162034_006`.
-Both used the supplied Inputs_sheet.xlsx, CDR, n=3, k=1, q_req=0.5,
-N=200000, Mpost=50000, seed=1. All 47 historical assessment rows were read,
-46 scores were used, and Excel row 46 was excluded. Seven raters and twelve
-profiles were retained. Historical row labels and scores were not edited.
+- The wheel builds and preserves `import lvreadiness` and `python -m lvreadiness`.
+- The full synthetic run matches the baseline exactly in all four calculation tables.
+- Prior mean `q_top`: **0.8357799736**; posterior mean: **0.7984797487**.
+- All 48 math expressions parse with KaTeX; all 29 local Markdown file links resolve.
+- The numerical model and accepted input behavior are unchanged.
 
-The machine-readable local comparison is
-`../../outputs/python/matlab_parity_report.json`; source hashes are in
-`../../outputs/python/source_manifest.json`. These assessment-derived results
-remain outside the publishable package. The following error magnitudes describe
-implementation parity without distributing individual assessments.
+### Run the public tests
 
-| Check | Maximum absolute difference | Acceptance |
+From the repository root, install first:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[test]"
+.\.venv\Scripts\python.exe -m pytest tests -q
+.\.venv\Scripts\python.exe -m lvreadiness run examples/synthetic_demo/Inputs_sheet.xlsx --output outputs --seed 1
+```
+
+Use `.venv/bin/python` on macOS/Linux. The saved reference is
+[`expected_results.json`](../examples/synthetic_demo/expected_results.json).
+Compare numerical summaries; timestamps and file bytes need not match.
+
+| Check | Covered by |
+| --- | --- |
+| Score mapping, Beta parameters, clipping | Unit model tests |
+| Mixture variance, tree equations, exact moments | Unit model tests |
+| Endpoint/large-count likelihoods, ESS, joint resampling | Unit model tests |
+| Invalid input, unassessed rows, aliases, duplicate detection | Unit validation tests |
+| Seed repeatability, API/CLI equivalence, exports, twelve figures | Integration test |
+| Historical analytical baseline | Optional local regression test |
+
+## Open review item
+
+**V2-01 — Dhrupath:** reject Excel TRUE/FALSE in `Z`, `n_test`, `k_fail`, and
+`q_req` before numeric conversion. Add tests for both Boolean values. Python can
+interpret `True` as 1 and `False` as 0. This readability audit leaves that accepted
+input behavior unchanged.
+
+## Recorded MATLAB comparison — September 22, 2026
+
+The earlier report records **34 passed** with the historical workbook available
+on Windows, MATLAB R2024b, and Python 3.12. Dependency versions are listed in
+[`requirements-verified.txt`](../requirements-verified.txt).
+The restricted reference files are not included here, so this audit does not
+independently rerun or certify that historical comparison.
+
+| Recorded check | Maximum absolute difference | Limit |
 | --- | --- | --- |
 | Profile parameters | 3.56e-15 | 1e-10 |
 | Pool statistics | 2.63e-13 | 1e-10 |
-| Tree calculations on identical MATLAB samples | 0 | 1e-10 |
-| Likelihood weights on identical MATLAB samples | 3.39e-21 | 1e-10 |
-| Joint resampling using native indices | 0 | Exact |
-| Node statistics on identical MATLAB samples | 1.95e-16 | 1e-10 |
-| Method comparison on identical MATLAB samples | 6.11e-16 | 1e-10 |
-| Independent prior node means | 0.000362 | 0.005 |
-| Independent posterior node means | 0.001371 | 0.005 |
-| Independent node quantiles, including medians | 0.004683 | 0.01 |
+| Tree on shared draws | 0 | 1e-10 |
+| Likelihood weights on shared draws | 3.39e-21 | 1e-10 |
+| Joint rows using native indices | 0 | Exact |
+| Node statistics on shared draws | 1.95e-16 | 1e-10 |
+| Method comparison on shared draws | 6.11e-16 | 1e-10 |
+| Independent prior means | 0.000362 | 0.005 |
+| Independent posterior means | 0.001371 | 0.005 |
+| Independent node quantiles | 0.004683 | 0.01 |
 
-All checks passed. All five worksheet names, column order, table shapes, numeric
-counts, and twelve PNG filenames matched the MATLAB reference. Additional checks
-used tolerance 0.01 for standard deviations and threshold probabilities; these
-are supplementary implementation checks rather than new specification limits.
-Analytical historical prior/posterior means matched the specification to 1e-10;
-the independent MC means passed five-standard-error checks. The prior check used
-sample SD/sqrt(N). The posterior check used a conservative approximation combining
-resampling uncertainty and ESS-based importance-sampling uncertainty.
+The recorded run used CDR, 3 tests, 1 failure, threshold 0.5, 200,000 prior draws,
+50,000 posterior draws, and seed 1. It retained 12 profiles from 7 raters and
+excluded one unassessed row. Five worksheet schemas and twelve PNG names matched.
+Additional spread/threshold checks used tolerance 0.01; analytical means used
+1e-10. Independent Monte Carlo means used five-standard-error checks.
 
-## Reproduce
+## Optional MATLAB reproduction
 
-From the enclosing research workspace, rerun MATLAB with:
+Requires the native v13 script and the authorized historical workbook outside
+the public repository. In MATLAB, set the script path and run the wrapper:
 
 ```matlab
-set(groot,'defaultFigureVisible','off');
-run('lv-readiness/tools/export_matlab_reference.m');
+referenceScript = 'C:/research/mc_faulttree_bayes_demo_v13.m';
+set(groot, 'defaultFigureVisible', 'off');
+run('tools/export_matlab_reference.m');
 ```
 
-Then run Python and compare the newly generated folders:
+Run Python on the same workbook, then compare the timestamped output folders:
 
 ```powershell
-.\.venv\Scripts\python run_lvreadiness.py run Inputs_sheet.xlsx --output outputs/python --seed 1
-.\.venv\Scripts\python lv-readiness/tools/verify_matlab.py MATLAB_RUN PYTHON_RUN Inputs_sheet.xlsx --report outputs/python/matlab_parity_report.json
-.\.venv\Scripts\python -m pytest lv-readiness/tests
+.\.venv\Scripts\python.exe -m lvreadiness run "C:\research\Inputs_sheet.xlsx" --output "C:\research\python_outputs" --seed 1
+.\.venv\Scripts\python.exe tools/verify_matlab.py MATLAB_RUN PYTHON_RUN "C:\research\Inputs_sheet.xlsx" --report "C:\research\matlab_parity_report.json"
 ```
 
-Substitute actual timestamped run paths for MATLAB_RUN and PYTHON_RUN.
-The MATLAB sample file contains restricted assessment-derived values and must
-remain local. Never commit the historical workbook or its outputs.
+Replace `MATLAB_RUN` and `PYTHON_RUN` with actual completed run paths.
+To enable the optional historical test:
 
-## Scope and remaining research decisions
+```powershell
+$env:LVREADINESS_HISTORICAL_INPUT = "C:\research\Inputs_sheet.xlsx"
+.\.venv\Scripts\python.exe -m pytest tests/regression -q
+```
 
-Default independent Python simulations are not bit-for-bit identical to MATLAB:
-the RNG and Beta samplers differ. Shared-sample checks demonstrate matching
-deterministic transformations; independent MC checks demonstrate agreement within
-the specified tolerances. Timestamps, binary files, and rendering differ by design.
-Python creates PNGs; native editable FIG files are generated only by MATLAB.
+## Limits
 
-The synthetic example uses only fictional scores and has a saved expected-results
-JSON. Python repeatability was checked in the installed environment; exact
-cross-version or cross-platform bitwise reproducibility has not been established.
-The public test suite skips the historical test when the restricted workbook is
-absent. A full second-source audit of the original assessment responses requires
-those original response records, which were not supplied here. This verifies the
-port and current workbook, not the scientific calibration of the readiness model.
-New indicator assignments and an open-source license still require author review.
+- MATLAB and Python have different samplers; identical seeds do not imply identical draws.
+- Shared-draw tests check deterministic calculations; independent runs use Monte Carlo tolerances.
+- Exact repeatability across dependency versions or platforms is not established.
+- The native MATLAB wrapper was reviewed but not executed in this audit environment.
+- These checks verify the implementation. They do not validate the model's score calibration or new indicator assignments.
