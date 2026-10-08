@@ -50,7 +50,7 @@ $\alpha_p=16.8168$, and $\beta_p=1.3832$.
 ## 3. Pool raters equally within each component
 
 Each rater supplies one success-probability distribution for this component.
-If there are $R$ raters, each receives weight $w_r=1/R$.
+If there are $R$ raters, each receives equal weight $w_r=1/R$.
 More indicators do not increase a rater's weight.
 
 Let $f_r(p)$ be rater $r$'s Beta density. Pool the **densities**, keeping each
