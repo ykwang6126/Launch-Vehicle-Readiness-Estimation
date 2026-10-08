@@ -25,8 +25,7 @@ components are then combined into the system model.
 
 A Monte Carlo sample $i$ is one draw within an analysis run, not a separate
 execution of the program. Each row contains seven basic-event values and four
-combined nodes. Use $j$ for components and $a$ for indicators; the earlier
-document reused $j$ for multiple purposes.
+combined nodes. Use $j$ for components and $a$ for indicators.
 
 ## 1. Average indicators within each rater profile
 
@@ -62,7 +61,6 @@ Interpolate linearly between these lookup values:
 | TRR | Test Readiness Review | 1.6 |
 | SVR | System Verification Review | 2.0 |
 
-These names and factors follow Table 6 of the April 2026 prelim document.
 One workbook represents one phase. $\lambda$ is its selected strength factor.
 
 $$
@@ -121,9 +119,7 @@ V_r=\frac{\alpha_{p,r}\beta_{p,r}}{(\alpha_{p,r}+\beta_{p,r})^2(\alpha_{p,r}+\be
 =\frac{\mu_r(1-\mu_r)}{s_r+1}.
 $$
 
-Source: [NIST/SEMATECH e-Handbook, Beta distribution, Common Statistics](https://www.itl.nist.gov/div898/handbook/eda/section3/eda366h.htm).
-NIST gives the standard deviation; squaring it gives the variance above.
-The second form substitutes $\mu_r=\alpha_{p,r}/s_r$ and $s_r=\alpha_{p,r}+\beta_{p,r}$.
+Here $\mu_r=\alpha_{p,r}/s_r$ and $s_r=\alpha_{p,r}+\beta_{p,r}$.
 
 $$
 \bar\mu=\sum_{r=1}^{R}\omega_r\mu_r.
@@ -158,18 +154,19 @@ The pool mean is 0.50. Within variance is 0.014545; between variance is 0.09;
 total variance is 0.104545. The mixture retains two peaks despite its mean of 0.50.
 See the [pooling plot](review_diagrams.md#2-equal-rater-pooling).
 
-Here, “linear opinion pool” means a weighted average of the rater densities.
-Rater assessments are alternative judgments, not extra successful or failed tests.
-For two identical rater priors, their equal-weight mixture equals that same prior;
-its variance does not halve. When means disagree, the between-rater term adds spread.
-This preserves disagreement without claiming that the assessments are independent
-measurements of the true probability.
+A **linear opinion pool** is a weighted average of rater densities. Identical
+priors leave the distribution unchanged; different means contribute between-rater
+variance. Pooling preserves uncertainty and disagreement without counting
+assessments as additional test evidence.
 
-### Comparison Beta: a moment-matched approximation
+### Optional comparison: a moment-matched Beta
 
-The exact mixture can have several peaks. To show what a single-distribution
-approximation would look like, calculate one Beta with the same pool mean and
-variance. Matching these two moments does not match the entire shape or tails.
+The main analysis samples the full linear pool defined above. Monte Carlo
+estimates have sampling error, but the pool is never replaced by a single Beta.
+
+For comparison plots and the PoolSummary table, calculate a single Beta with
+the same pool mean and variance. This approximation can have different peaks
+and tails from the mixture.
 The approximation strength is $s_{\mathrm{MM}}$ (“MM” means moment matched):
 
 $$
@@ -185,7 +182,6 @@ $$
 
 For the two-rater example, $s_{\mathrm{MM}}=1.391304$ and both shape parameters
 are 0.695652. This Beta has a different shape from the two-peaked exact mixture.
-The method-of-moments equations also appear in the NIST reference above.
 It does not replace the mixture used in the main calculation.
 It is shown as the dashed comparison curve in the component plots and as
 `MomentMatchedStrength`, `MomentMatchedAlpha`, and `MomentMatchedBeta` in PoolSummary.
@@ -223,46 +219,48 @@ cross-component dependence are outside v0.1.
 
 Assume binary test outcomes, independent tests conditional on a constant failure
 probability, and comparable design / test conditions. There are $N_t$ physical
-tests and $K_t$ observed failures. For prior Monte Carlo sample $i$, the full
-binomial likelihood is the prelim document's equation (23):
+tests and $K_t$ observed failures. For each prior sample $i$, evaluate how
+well its system failure probability $q_{\mathrm{top}}^{(i)}$ explains those outcomes:
 
 $$
 L_i=\Pr(K_t\mid N_t,q_{\mathrm{top}}^{(i)})
 =\binom{N_t}{K_t}(q_{\mathrm{top}}^{(i)})^{K_t}(1-q_{\mathrm{top}}^{(i)})^{N_t-K_t}.
 $$
 
-Here $q_{\mathrm{top}}^{(i)}$ is the calculated system failure probability in
-prior row $i$. Define the coefficient-free likelihood used in code:
+$L_i$ is the **likelihood**: the probability of observing the failure count if
+sample $i$'s failure probability were the true value. Normalize these likelihoods
+across the $N$ prior samples to obtain **posterior sample weights**:
 
 $$
-\ell_i=(q_{\mathrm{top}}^{(i)})^{K_t}(1-q_{\mathrm{top}}^{(i)})^{N_t-K_t}.
+w_i=\frac{L_i}{\sum_{u=1}^{N}L_u}.
 $$
 
-The normalized weight is the prelim equation (24), with $u$ used as the summation
-index to avoid confusing it with a failure count or component index:
+$w_i$ is sample $i$'s share of the total weight. Samples that better explain the
+tests receive more weight; the weights sum to 1.
 
-$$
-w_i=\frac{L_i}{\sum_{u=1}^{N}L_u}=\frac{\ell_i}{\sum_{u=1}^{N}\ell_u}.
-$$
+**Example:** three tests and one failure, with three illustrative prior samples:
 
-The coefficient $\binom{N_t}{K_t}$ is the same for every sample, so it cancels.
-For three tests and one failure it is 3: multiplying every likelihood by 3 leaves
-all normalized weights unchanged. The earlier shorthand used $n=N_t$ and $k=K_t$.
+| Sample $i$ | $q_{\mathrm{top}}^{(i)}$ | Likelihood $L_i=3q(1-q)^2$ | Weight $w_i=L_i/0.645$ |
+| --- | --- | --- | --- |
+| 1 | 0.10 | 0.243 | 0.377 |
+| 2 | 0.50 | 0.375 | 0.581 |
+| 3 | 0.90 | 0.027 | 0.042 |
 
-`posterior_weights` computes $\ell_i$ in log space, skips zero exponents at
-endpoints, and rejects evidence supported by no draws. With $N_t=0$, weights are
-$1/N$. The weights sum to 1; they are not rater-pooling weights.
+The code omits the common coefficient $\binom{N_t}{K_t}$ because it cancels
+when normalizing. `posterior_weights` uses logarithms to avoid numerical
+underflow. With no tests, all weights are $1/N$; if no sample supports the
+evidence, the calculation stops.
 
 ### Weighted estimates and resampling
 
-The direct weighted posterior mean matches the prelim equation (25):
+The direct weighted posterior mean is:
 
 $$
 \widehat\mu_{\mathrm{post}}=\sum_{i=1}^{N}w_i q_{\mathrm{top}}^{(i)}.
 $$
 
 This is the estimated posterior mean failure probability, not a Beta mapping mean.
-The pipeline also calculates weighted variance as in prelim equation (26).
+The pipeline also calculates weighted variance.
 These diagnostics appear in `WeightedPosteriorMean` and `WeightedPosteriorVariance`.
 
 The code then resamples $N_{\mathrm{post}}$ **complete rows** using $w_i$.
@@ -277,31 +275,38 @@ $$
 \mathrm{ESS}=\frac{1}{\sum_{i=1}^{N}w_i^2}.
 $$
 
-ESS measures how broadly the likelihood weights are spread over the prior samples.
-It ranges from 1 to $N$: uniform weights give $N$; one nonzero weight gives 1.
-It is not the physical test count or the posterior-resample count. Resampling
-more rows does not increase this ESS. The code warns below 1% of $N$; that is a
-computational diagnostic threshold, not a system readiness criterion.
+ESS is the effective number of prior samples contributing after weighting.
+It ranges from 1 to $N$; equal weights give $N$. Low ESS means the posterior
+relies on few samples. The code warns below $0.01N$: increase `n_prior` and
+check result stability. ESS measures numerical sampling adequacy, not readiness.
 
 ## 6. Interpret results
+
+The requirement is a maximum acceptable system failure probability $q_{\mathrm{req}}$
+(`q_req`). Meeting it means $q_{\mathrm{top}}\le q_{\mathrm{req}}$, equivalently
+$p_{\mathrm{top}}\ge 1-q_{\mathrm{req}}$.
+
+The existing top-event output columns report the fraction of samples on each
+side of this threshold:
 
 $$
 P_{\mathrm{meet}}=P(q_{\mathrm{top}}\le q_{\mathrm{req}}), \qquad
 P_{\mathrm{exc}}=P(q_{\mathrm{top}}>q_{\mathrm{req}}).
 $$
 
-Here $q_{\mathrm{req}}$ is the maximum acceptable system failure probability
-(`q_req`); $P_{\mathrm{meet}}$ and $P_{\mathrm{exc}}$ are probability mass at or
-below / above that threshold in the distribution being summarized.
-These quantify confidence in meeting the failure-probability requirement.
-Estimated mission success is a different quantity:
+`PriorPmeet` / `PostPmeet` estimate the probability that the requirement is met;
+`PriorPexc` / `PostPexc` report its complement. These summarize uncertainty about
+meeting the threshold. The estimated mission success probability is:
 
 $$
 E[p_{\mathrm{top}}]=1-E[q_{\mathrm{top}}].
 $$
 
-Summaries use population standard deviations and Hazen percentiles to match
-MATLAB v13. Threshold statistics are reported only for the top event.
+For example, if $q_{\mathrm{req}}=0.10$ and 80% of posterior samples are at or
+below 0.10, `PostPmeet` is 0.80. This does not mean mission success is 0.80.
+
+Summaries use population standard deviations and Hazen percentiles.
+Threshold statistics are reported only for the top event.
 
 ## Exact moments for verification
 
