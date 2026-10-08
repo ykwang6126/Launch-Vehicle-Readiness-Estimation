@@ -11,8 +11,17 @@ threshold enter at different stages.
 
 ![Two-rater mixture](figures/review_pooling.svg)
 
-Each rater has weight 0.5. The exact mixture keeps both peaks; averaging the
-means would hide disagreement. The example uses Beta(2, 8) and Beta(8, 2).
+The dashed curves are two alternative rater priors. The solid curve is their
+weighted-average density: 0.5 A + 0.5 B. Its total area is still 1.
+
+Near A's peak, B contributes little, so the solid density is about half of A's
+density; the same occurs near B's peak. This allocates belief to both judgments.
+It does not mean that physical extreme outcomes became safer or that disagreement
+was resolved. Probabilities are areas over intervals, not curve heights.
+
+The mean is 0.50, yet neither rater's distribution is centered there. Keeping both
+peaks makes that disagreement visible. For two identical priors, the pooled curve
+would be unchanged. The example uses Beta(2, 8) and Beta(8, 2).
 
 ## 3. Joint posterior resampling
 

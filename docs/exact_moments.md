@@ -6,6 +6,17 @@ Monte Carlo results vary slightly with the seed. Analytical moments give expecte
 means without drawing samples, so we can check whether that variation is reasonable.
 They are not additional assessment inputs or another updating method.
 
+| Index / symbol | Definition |
+| --- | --- |
+| $j=1,\ldots,7$ | Component / basic-event index |
+| $r=1,\ldots,R_j$ | Rater within component $j$ |
+| $h$ | Nonnegative integer moment order; not a component index |
+| $\ell$ | Auxiliary product index from 0 to $h-1$ |
+| $B_{j,h}$ | Moment of order $h$ for component $j$'s pooled success distribution |
+| $M_h$ | Moment of order $h$ for system success probability |
+| $\omega_{j,r}$ | Equal rater weight within component $j$ |
+| $\alpha$, $\beta$ | Positive success-Beta shape parameters |
+
 ## 1. One rater's Beta prior
 
 For success probability $p$ with Beta parameters $\alpha$ and $\beta$:
@@ -18,39 +29,39 @@ $$
 E[p^2]=\frac{\alpha(\alpha+1)}{(\alpha+\beta)(\alpha+\beta+1)}.
 $$
 
-More generally, for integer $j\ge1$:
+More generally, for integer $h\ge1$:
 
 $$
-E[p^j]=\prod_{\ell=0}^{j-1}\frac{\alpha+\ell}{\alpha+\beta+\ell}.
+E[p^h]=\prod_{\ell=0}^{h-1}\frac{\alpha+\ell}{\alpha+\beta+\ell}.
 $$
 
-For $j=0$, the moment is 1. These are raw moments: $E[p^2]$ is not
+For $h=0$, the moment is 1. These are raw moments: $E[p^2]$ is not
 $E[p]^2$, and variance is $E[p^2]-E[p]^2$.
 
 ## 2. One component's rater mixture
 
-Let $B_{c,j}$ denote the $j$th success moment for component $c$.
+Let $B_{j,h}$ denote the $h$th success moment for component $j$.
 Average each rater's moment using the same pooling weights:
 
 $$
-B_{c,j}=\sum_{r=1}^{R_c}w_{c,r} E[p_{c,r}^j].
+B_{j,h}=\sum_{r=1}^{R_j}\omega_{j,r} E[p_{j,r}^h].
 $$
 
-$R_c$ is the number of retained rater profiles for component $c$;
-$w_{c,r}=1/R_c$ in v0.1. $p_{c,r}$ follows that rater's success Beta.
+$R_j$ is the number of retained rater profiles for component $j$;
+$\omega_{j,r}=1/R_j$ in v0.1. $p_{j,r}$ follows that rater's success Beta.
 
 ## 3. System success
 
 The fixed OR failure tree means all seven components must succeed:
 
 $$
-p_{\mathrm{top}}=\prod_{c=1}^{7}p_c.
+p_{\mathrm{top}}=\prod_{j=1}^{7}p_j.
 $$
 
 With independent component priors, the moments multiply:
 
 $$
-M_j=E[p_{\mathrm{top}}^j]=\prod_{c=1}^{7}B_{c,j},\qquad M_0=1.
+M_h=E[p_{\mathrm{top}}^h]=\prod_{j=1}^{7}B_{j,h},\qquad M_0=1.
 $$
 
 Therefore:
@@ -64,7 +75,7 @@ $$
 $$
 
 **Simple example:** seven independent components each have Beta(2, 2) success
-priors. Then $B_{c,1}=0.5$, $B_{c,2}=0.3$, $M_1=0.5^7=0.0078125$,
+priors. Then $B_{j,1}=0.5$, $B_{j,2}=0.3$, $M_1=0.5^7=0.0078125$,
 and $M_2=0.3^7=0.0002187$. Mean system failure is 0.9921875.
 This deliberately simple example checks arithmetic; it is not a realistic vehicle.
 
