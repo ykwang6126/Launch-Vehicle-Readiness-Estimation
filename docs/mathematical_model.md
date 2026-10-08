@@ -38,7 +38,7 @@ $$
 
 $$
 \alpha_p = \mu s, \qquad \beta_p = (1-\mu)s, \qquad
-p \sim \operatorname{Beta}(\alpha_p,\beta_p).
+p \sim \mathrm{Beta}(\alpha_p,\beta_p).
 $$
 
 `mu` is the prior success mean; `strength` ($s$) controls its spread.
@@ -49,37 +49,72 @@ $\alpha_p=16.8168$, and $\beta_p=1.3832$.
 
 ## 3. Pool raters equally within each component
 
-For $R$ profiles, assign $w_r=1/R$ and retain the full mixture:
+Each rater supplies one success-probability distribution for this component.
+If there are $R$ raters, each receives weight $w_r=1/R$.
+More indicators do not increase a rater's weight.
+
+Let $f_r(p)$ be rater $r$'s Beta density. Pool the **densities**, keeping each
+rater's mean and uncertainty:
 
 $$
-f(p)=\sum_{r=1}^{R} w_r\,\operatorname{Beta}(p;\alpha_{p,r},\beta_{p,r}).
+f(p)=\sum_{r=1}^{R}w_r f_r(p).
 $$
 
-Sampling selects a rater profile, draws from its Beta, and converts to $q=1-p$.
-More indicators do not give a rater more weight.
+For each Monte Carlo draw, select one rater with these weights, draw success
+probability $p$ from that rater's Beta, then store failure probability $q=1-p$.
+This selection is repeated independently for each component.
+
+### Mean and variance
+
+For rater $r$, $\mu_r$ is the success mean and $s_r$ is Beta strength.
 
 $$
-\bar\mu=\sum_r w_r\mu_r.
+\bar\mu=\sum_{r=1}^{R}w_r\mu_r.
 $$
 
 $$
-V_{\mathrm{within}}=\sum_r w_r\frac{\mu_r(1-\mu_r)}{s_r+1}, \qquad
-V_{\mathrm{between}}=\sum_r w_r(\mu_r-\bar\mu)^2.
+V_{\mathrm{within}}=\sum_{r=1}^{R}w_r\frac{\mu_r(1-\mu_r)}{s_r+1}.
+$$
+
+$$
+V_{\mathrm{between}}=\sum_{r=1}^{R}w_r(\mu_r-\bar\mu)^2.
 $$
 
 $$
 V_{\mathrm{pool}}=V_{\mathrm{within}}+V_{\mathrm{between}}.
 $$
 
-Within variance describes individual rater uncertainty; between variance
-captures disagreement. A single moment-matched Beta is shown for comparison:
+| Quantity | Meaning |
+| --- | --- |
+| Within-rater variance | Average uncertainty in the individual priors |
+| Between-rater variance | Disagreement between rater means |
+| Pool variance | Both sources combined; not divided by the number of raters |
+
+**Worked example** (illustrative Beta parameters, not T/O mapping outputs):
+
+| Rater | Success prior | Mean | Variance | Weight |
+| --- | --- | --- | --- | --- |
+| A | Beta(2, 8) | 0.20 | 0.014545 | 0.50 |
+| B | Beta(8, 2) | 0.80 | 0.014545 | 0.50 |
+
+The pool mean is 0.50. Within variance is 0.014545; between variance is 0.09;
+total variance is 0.104545. The mixture retains two peaks despite its mean of 0.50.
+See the [pooling plot](review_diagrams.md#2-equal-rater-pooling).
+
+This is a linear opinion pool. It does not treat the raters as independent
+observations that automatically increase statistical precision.
+
+### Comparison Beta
+
+A single Beta with the same mean and variance is exported for comparison:
 
 $$
 s_{\mathrm{MM}}=\frac{\bar\mu(1-\bar\mu)}{V_{\mathrm{pool}}}-1.
 $$
 
 Its parameters are $\bar\mu s_{\mathrm{MM}}$ and $(1-\bar\mu)s_{\mathrm{MM}}$.
-It does not replace the mixture in sampling.
+It does not replace the mixture used in the main calculation.
+The separate average-score comparison also does not drive the main calculation.
 
 ## 4. Combine components through the fault tree
 
@@ -147,21 +182,14 @@ MATLAB v13. Threshold statistics are reported only for the top event.
 
 ## Exact moments for verification
 
-Let $M_j=E[p_{\mathrm{top}}^j]$. Independence gives:
+An exact moment is a mean of a power, calculated analytically rather than from
+random draws. Here $M_1$ is the system success mean and $M_2$ is the mean of
+squared system success probability. These are optional numerical checks.
 
-$$
-M_j=\prod_{c=1}^{7}\left[
-\sum_{r=1}^{R_c}w_{c,r}\prod_{\ell=0}^{j-1}
-\frac{\alpha_{c,r}+\ell}{\alpha_{c,r}+\beta_{c,r}+\ell}
-\right], \qquad M_0=1.
-$$
+The [verification appendix](exact_moments.md) derives them from the component
+Beta mixtures and explains the special three-test, one-failure check.
+They do not change the model or update algorithm. The special formula does not
+apply unchanged to other test counts.
 
-For the reference case $n=3$, $k=1$:
-
-$$
-E[q_{\mathrm{top}}]=1-M_1, \qquad
-E[q_{\mathrm{top}}\mid k=1,n=3]=\frac{M_2-2M_3+M_4}{M_2-M_3}.
-$$
-
-These checks do not depend on a particular random seed. The score mappings remain
-model assumptions; implementation verification does not establish predictive calibration.
+The score mappings and independence assumptions still require research review;
+agreement with exact moments verifies calculation, not predictive calibration.

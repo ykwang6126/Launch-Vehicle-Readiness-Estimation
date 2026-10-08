@@ -35,6 +35,17 @@ Compare numerical summaries; timestamps and file bytes need not match.
 | Seed repeatability, API/CLI equivalence, exports, twelve figures | Integration test |
 | Historical analytical baseline | Optional local regression test |
 
+## October 8 review materials check
+
+- Public suite rerun: **33 passed, 1 restricted-workbook skip**.
+- Full fictional example retains prior/posterior mean failure probabilities
+  0.8357799736 and 0.7984797487.
+- A separate direct Beta-function calculation reproduces the prior moments
+  and the three-test, one-failure analytical posterior mean.
+- Pooling illustration reproduces within variance 0.01454545 and between variance 0.09.
+- The unsupported `\operatorname` math macro was replaced after the rendering report.
+- These changes affect documentation and review materials only.
+
 ## Open review item
 
 **V2-01 — Dhrupath:** reject Excel TRUE/FALSE in `Z`, `n_test`, `k_fail`, and
