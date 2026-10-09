@@ -1,12 +1,28 @@
-# Synthetic demonstration
+# Synthetic demo
 
-Inputs_sheet.xlsx contains a fictional SYN01 assessment with technical and
-organizational score 2 for all seven components, at CDR. There are no historical
-ratings in this example. Indicators use the current overview terminology, with
-the specification's proposed T/O categories. Those assignments still require
-researcher confirmation before new real assessments.
+| File | Purpose |
+| --- | --- |
+| `Inputs_sheet.xlsx` | Fictional assessment: seven components, one rater, all scores 2 |
+| `expected_results.json` | Analytical means, saved Python statistics, and workbook fingerprint |
 
-For every component the exact mean success probability is 0.7725; the exact
-prior top failure mean is 0.8358316563. Three tests and one observed failure are
-included as synthetic evidence; q_req=0.5. Run the CLI as shown in the package
-README. expected_results.json records analytic and seeded Python results.
+Settings: CDR, 3 tests, 1 failure, `q_req = 0.5`.
+Run from the package folder after installation:
+
+```bash
+python -m lvreadiness run examples/synthetic_demo/Inputs_sheet.xlsx --output outputs --seed 1
+```
+
+At 200,000 prior draws and 50,000 posterior draws, the saved Python means are:
+
+| Failure probability | Mean |
+| --- | --- |
+| Prior `q_top` | 0.8357799736 |
+| Posterior `q_top` | 0.7984797487 |
+
+The analytical means are approximately 0.8358316563 and 0.7986232148.
+Monte Carlo results vary with sampler versions; the analytical means do not.
+This high-failure fictional example demonstrates the calculation, not a real
+vehicle assessment.
+
+Rebuild the workbook with `python tools/build_synthetic_example.py`. Rebuilding
+can change the workbook's byte fingerprint even when the cell values are unchanged.

@@ -84,3 +84,18 @@ absent. A full second-source audit of the original assessment responses requires
 those original response records, which were not supplied here. This verifies the
 port and current workbook, not the scientific calibration of the readiness model.
 New indicator assignments and an open-source license still require author review.
+
+## Documentation transfer — October 2026
+
+The expanded explanations and diagrams were transferred from the readability
+review and adapted to main's existing package layout. The review branch's code
+refactoring and its audit results were not merged into main. The recorded
+September 22 results above remain the implementation verification record.
+
+For a public checkout, enter `lv-readiness/`, install with
+`python -m pip install -e ".[test]"`, then run `python -m pytest tests -q`.
+The historical regression test skips when its local workbook is absent.
+
+Open input review item: Excel TRUE/FALSE values are not explicitly rejected
+before numeric conversion in all workbook numeric fields. Use numeric values;
+the planned rejection checks remain a code-review task.
