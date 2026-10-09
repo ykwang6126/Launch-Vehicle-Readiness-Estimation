@@ -88,10 +88,14 @@ def sample_components(
     for component_index, component in enumerate(COMPONENTS):
         component_profiles = profiles.loc[profiles.Component.eq(component)]
         # First decide which rater supplies each draw for this component.
+        # selected_profiles function selects the rater using random number generator
         selected_profiles = rng.choice(
             len(component_profiles),
+            #length of array
             size=n,
+            #n is the number of Monte Carlo draws, how many you are extracting from the matrix component_profiles
             p=component_profiles.WeightWithinComponent.to_numpy(),
+            #function specifies the probability of selecting each option
         )
         for profile_index, profile in enumerate(component_profiles.itertuples()):
             # This Boolean mask locates draws assigned to the current profile.
