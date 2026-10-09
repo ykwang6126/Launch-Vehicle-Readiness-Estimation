@@ -39,7 +39,7 @@ Estimated mission-success probability is **1 − mean system failure probability
 
 ## Research context and scope
 
-This project addresses readiness assessment for launch vehicles with limited evidence. Its broader research motivation is relevant to other safety-critical systems, including ADAS and automated vehicles, where engineers must combine assessments and testing to support safety decisions. **The current implementation is a launch-vehicle model; it has not been validated for ADAS or automated vehicles.**
+This project addresses readiness assessment for launch vehicles with limited evidence. Its broader research motivation is relevant to other safety-critical systems, including aircraft, satellites, or automated vehicles, where engineers must combine assessments and testing to support safety decisions.
 
 Version 0.1 uses a fixed seven-component fault tree, independent component priors, and comparable binary system-level test outcomes. Score mappings are model assumptions that require calibration and research review. Numerical verification checks implementation consistency; it does not establish predictive accuracy for a new system.
 
