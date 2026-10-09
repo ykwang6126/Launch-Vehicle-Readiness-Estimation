@@ -1,5 +1,7 @@
 """One workflow shared by the Python API and command-line entry point."""
 
+#imports all neccessary libraries
+
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -49,7 +51,7 @@ class AnalysisResult:
     weighted_mean: np.ndarray
     weighted_variance: np.ndarray
 
-
+#creates a folder to organize the run sequence
 def _create_run(output: Path) -> tuple[Path, str]:
     """Create a timestamped folder, retrying if another run uses the same name."""
     output.mkdir(parents=True, exist_ok=True)
@@ -63,7 +65,7 @@ def _create_run(output: Path) -> tuple[Path, str]:
             time.sleep(0.001)
     raise FileExistsError("Unable to allocate a unique run folder.")
 
-
+#actual parameter to call analysis code
 def run_analysis(
     input_path: str | Path,
     output_dir: str | Path,
@@ -73,16 +75,16 @@ def run_analysis(
 ) -> AnalysisResult:
     """Execute specification revision 3 using one seeded NumPy PCG64 generator.
 
-    Numerical outputs are reproducible in a pinned Python environment. MATLAB
+    Numerical outputs are reproducible in a pinned Python environment. MATLAB code
     uses different random samplers; identical seeds do not imply identical draws.
     """
 
-    # 1. Validate run options.
+    # 1. Validate run options. called in validate.py
     # n_prior/n_posterior are Monte Carlo sample counts, not numbers of raters.
     validate_run_options(n_prior, n_posterior, seed)
     input_path = Path(input_path).resolve()
 
-    # 2. Read the assessment workbook and validate/clean the MATLAB_Input data.
+    # 2. Read the assessment workbook and validate/clean the MATLAB_Input data; including excluding null data points/sets
     raw_input = read_input(input_path)
     assessment_rows, rater_profiles, analysis_settings, excluded_rows = validate_input(
         raw_input
@@ -91,12 +93,12 @@ def run_analysis(
     # 3. Convert each (Component, RaterID) profile into a Beta prior.
     rater_profiles = build_priors(rater_profiles, analysis_settings.lambda_phase)
 
-    # 4A. Summarize each component's equal-weight rater mixture for reporting.
+    # 4A. Summarize each component's equal-weight rater mixture for reporting. Isolates each rater profile then combines into one
     component_pools = summarize_pools(rater_profiles)
 
     # 4B. Generate the component-level prior Monte Carlo samples.
     # For each component and each draw: choose a rater profile with equal weight,
-    # draw p from that profile's Beta distribution, then convert to q = 1 - p.
+    # component_failures draw p from that profile's Beta distribution, then convert to q = 1 - p.
     rng = np.random.Generator(np.random.PCG64(seed))
     component_failures = sample_components(rater_profiles, n_prior, rng)
 
