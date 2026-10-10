@@ -90,6 +90,14 @@ def run_analysis(
         raw_input
     )
 
+    computed = compute_analysis(rater_profiles, analysis_settings, n_prior, n_posterior, seed)
+    return generate_report(input_path, output_dir, assessment_rows, excluded_rows,
+                           analysis_settings, computed, n_prior, n_posterior, seed)
+
+
+def compute_analysis(rater_profiles, analysis_settings, n_prior: int,
+                     n_posterior: int, seed: int):
+    """Run the existing numerical workflow without generating files."""
     # 3. Convert each (Component, RaterID) profile into a Beta prior.
     rater_profiles = build_priors(rater_profiles, analysis_settings.lambda_phase)
 
@@ -151,6 +159,32 @@ def run_analysis(
         average_score_posterior,
     )
 
+    return dict(rater_profiles=rater_profiles, component_pools=component_pools,
+                prior_samples=prior_samples, posterior_samples=posterior_samples,
+                likelihood_weights=likelihood_weights, posterior_indices=posterior_indices,
+                effective_sample_size=effective_sample_size,
+                weighted_mean=weighted_mean, weighted_variance=weighted_variance,
+                node_summary=node_summary, average_score_prior=average_score_prior,
+                method_comparison=method_comparison)
+
+
+def generate_report(input_path, output_dir, assessment_rows, excluded_rows,
+                    analysis_settings, computed, n_prior: int,
+                    n_posterior: int, seed: int) -> AnalysisResult:
+    """Write plots, spreadsheets and metadata from completed calculations."""
+    locals_from_result = computed
+    rater_profiles = locals_from_result["rater_profiles"]
+    component_pools = locals_from_result["component_pools"]
+    prior_samples = locals_from_result["prior_samples"]
+    posterior_samples = locals_from_result["posterior_samples"]
+    likelihood_weights = locals_from_result["likelihood_weights"]
+    posterior_indices = locals_from_result["posterior_indices"]
+    effective_sample_size = locals_from_result["effective_sample_size"]
+    weighted_mean = locals_from_result["weighted_mean"]
+    weighted_variance = locals_from_result["weighted_variance"]
+    node_summary = locals_from_result["node_summary"]
+    average_score_prior = locals_from_result["average_score_prior"]
+    method_comparison = locals_from_result["method_comparison"]
     # 9. Create a unique run folder and assemble reproducibility metadata.
     run_dir, run_stamp = _create_run(Path(output_dir).resolve())
 
