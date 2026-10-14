@@ -94,11 +94,12 @@ def validate_evidence(n: int, k: int) -> None:
         )
 
 
-def validate_input(
-    raw_input: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame, Settings, list[int]]:
-    """Validate MATLAB_Input and build one T/O score profile per component/rater."""
+def _read_workbook_settings(raw_input: pd.DataFrame) -> Settings:
+    """Check headers, then read the single phase and consistent numeric settings.
 
+    This stage runs first so malformed workbook settings keep their original
+    error precedence, even if assessment rows also contain invalid data.
+    """
     # 1. Check required columns.
     required = {
         "Branch",
@@ -188,6 +189,15 @@ def validate_input(
     # analysis_settings.phase, .n_test, .k_fail, .q_req, and .lambda_phase.
     analysis_settings = Settings(lifecycle_phase, int(n_test), int(k_fail), q_req)
 
+    return analysis_settings
+
+
+def _prepare_assessment_rows(raw_input: pd.DataFrame) -> pd.DataFrame:
+    """Clean identifiers and scores while retaining original Excel row numbers.
+
+    Blank assessment rows are removed. Explicitly unassessed indicators remain
+    traceable but do not contribute scores when profiles are built.
+    """
     # 4. Copy the raw table before cleaning it and remember original Excel rows.
     assessment_rows = raw_input.copy()
 
@@ -253,6 +263,17 @@ def validate_input(
             f"Invalid Z at Excel rows {assessment_rows.loc[invalid_score, 'SourceRow'].tolist()}."
         )
 
+    return assessment_rows
+
+
+def _build_rater_profiles(
+    assessment_rows: pd.DataFrame,
+) -> tuple[pd.DataFrame, list[int]]:
+    """Require valid component/rater groups and average their T and O scores.
+
+    Return profile rows and excluded Excel row numbers. Preserve first-seen
+    rater order because sampling consumes the random stream in that order.
+    """
     # 8. Build one profile per (Component, RaterID).
     # zip(COMPONENTS, BRANCHES) walks the matched component/branch pairs together.
     # groupby("RaterID") then separates that component's rows by individual rater.
@@ -301,6 +322,21 @@ def validate_input(
                 )
             )
 
+    return pd.DataFrame(rater_profiles), excluded_rows
+
+
+def validate_input(
+    raw_input: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, Settings, list[int]]:
+    """Validate MATLAB_Input and build one T/O score profile per component/rater.
+
+    Return cleaned assessment rows, profile means/counts, workbook settings,
+    and excluded Excel row numbers. Validation stops at the first input error.
+    """
+    analysis_settings = _read_workbook_settings(raw_input)
+    assessment_rows = _prepare_assessment_rows(raw_input)
+    rater_profiles, excluded_rows = _build_rater_profiles(assessment_rows)
+
     # 9. Report excluded "Unable to assess" rows and return validated model inputs.
     if excluded_rows:
         warnings.warn(
@@ -311,7 +347,7 @@ def validate_input(
 
     return (
         assessment_rows,
-        pd.DataFrame(rater_profiles),
+        rater_profiles,
         analysis_settings,
         excluded_rows,
     )

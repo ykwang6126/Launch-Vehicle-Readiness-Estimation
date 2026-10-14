@@ -26,3 +26,6 @@ Suggested review order: `config` → `io` → `validation` → `priors` → `poo
 Comments explain inputs, array shapes, equations, and the reason for important
 steps. Mathematical symbols such as `mu`, `alpha`, and `beta` follow the
 [model documentation](../docs/mathematical_model.md).
+
+For a short explanation of the pandas operations and probability notation, see
+the [reading guide](../docs/reading_the_code.md).

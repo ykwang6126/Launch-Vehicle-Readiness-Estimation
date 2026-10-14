@@ -84,18 +84,15 @@ def sample_components(
     profile's success Beta, and stores q = 1 - p. Components are sampled independently.
     rng is supplied by the pipeline so all draws use one reproducible random stream.
     """
-    component_failures = np.empty((n, 7))
+    component_failures = np.empty((n, len(COMPONENTS)))
     for component_index, component in enumerate(COMPONENTS):
         component_profiles = profiles.loc[profiles.Component.eq(component)]
-        # First decide which rater supplies each draw for this component.
-        # selected_profiles function selects the rater using random number generator
+        # Select profile indices with replacement, using equal rater weights.
+        # A profile may supply many draws; this does not remove rows from the table.
         selected_profiles = rng.choice(
             len(component_profiles),
-            #length of array
             size=n,
-            #n is the number of Monte Carlo draws, how many you are extracting from the matrix component_profiles
             p=component_profiles.WeightWithinComponent.to_numpy(),
-            #function specifies the probability of selecting each option
         )
         for profile_index, profile in enumerate(component_profiles.itertuples()):
             # This Boolean mask locates draws assigned to the current profile.
@@ -114,7 +111,7 @@ def sample_averaged_scores(
     Average T/O scores across profiles before mapping to one Beta per component.
     These samples do not enter the primary prior or posterior calculation.
     """
-    component_failures = np.empty((n, 7))
+    component_failures = np.empty((n, len(COMPONENTS)))
     for component_index, component in enumerate(COMPONENTS):
         component_profiles = profiles.loc[profiles.Component.eq(component)]
         beta_parameters = parameters(

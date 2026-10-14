@@ -2,13 +2,30 @@
 
 import numpy as np
 import pandas as pd
+from typing import TypedDict
 
 from .config import MEAN_CLIP, MU_T_LEVELS, M_O_LEVELS, S_O_LEVELS, SCORE_LEVELS
 
 
+class PriorParameters(TypedDict):
+    """Paper symbols exported as RaterParameters columns.
+
+    Each value is a scalar for scalar scores or an array for batches of profiles.
+    alpha_p and beta_p describe success probability, not observed test counts.
+    """
+
+    mu_T: np.ndarray | float
+    m_O: np.ndarray | float
+    s_O: np.ndarray | float
+    mu: np.ndarray | float
+    strength: np.ndarray | float
+    alpha_p: np.ndarray | float
+    beta_p: np.ndarray | float
+
+
 def parameters(
     z_t: np.ndarray | float, z_o: np.ndarray | float, lambda_phase: float
-) -> dict:
+) -> PriorParameters:
     """Convert T/O mean scores into success-Beta parameters for one or many profiles.
 
     z_t and z_o are category averages on 0–4, including fractional averages.
@@ -40,34 +57,26 @@ def parameters(
 
 
 def build_priors(profiles: pd.DataFrame, lambda_phase: float) -> pd.DataFrame:
-    """Attach Beta parameters and equal-within-component weights."""
+    """Attach Beta parameters and equal-within-component weights.
+
+    Input rows identify Component/RaterID and contain mean scores Z_T and Z_O.
+    The returned copy retains all input columns and adds the parameter columns.
+    """
 
     # Work on a copy so adding columns does not modify the input table.
     rater_priors = profiles.copy()
 
-    # Pass each profile's Z_T and Z_O values, together with lambda_phase,
-    # to the helper that calculates the distribution parameters.
-    # to_numpy() converts the pandas columns into NumPy arrays.
-    # items() lets us iterate over each name and its corresponding values.
+    # Calculate all profiles together; each parameter array keeps the input row order.
     for parameter_name, parameter_values in parameters(
         rater_priors.Z_T.to_numpy(), rater_priors.Z_O.to_numpy(), lambda_phase
     ).items():
-        # Add a column (or replace an existing one) with these values.
-        # Each value corresponds to a row in the rater profile table.
         rater_priors[parameter_name] = parameter_values
 
-    # transform("size") repeats the number of profiles for each component.
     # A rater with more indicators still receives the same weight as other raters.
-    #
-    # groupby("Component") groups rows belonging to the same component.
-    # transform("size") returns a count aligned with every original row.
-    # Taking 1 / count gives every profile in that component equal weight.
-    #
     # Example: three profiles for a component each receive weight 1/3.
-    # These weights are used later to randomly select a rater profile.
+    # transform("size") aligns the component's profile count with every input row.
     rater_priors["WeightWithinComponent"] = 1 / rater_priors.groupby(
         "Component"
     ).Component.transform("size")
 
-    # Return the profiles with their calculated parameters and weights.
     return rater_priors

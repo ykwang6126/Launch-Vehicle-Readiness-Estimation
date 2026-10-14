@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from .config import COMPONENTS
+
 
 def fault_tree_nodes(q: np.ndarray) -> np.ndarray:
     """Propagate an N-by-7 component failure array through the fixed OR tree.
@@ -14,15 +16,28 @@ def fault_tree_nodes(q: np.ndarray) -> np.ndarray:
     q = np.asarray(q, dtype=float)
     if (
         q.ndim != 2
-        or q.shape[1] != 7
+        or q.shape[1] != len(COMPONENTS)
         or not len(q)
         or not np.all(np.isfinite(q) & (q >= 0) & (q <= 1))
     ):
         raise ValueError("Expected a nonempty N by 7 array of probabilities in [0, 1].")
+    # Unpack views in config.COMPONENTS order. Each vector has one probability
+    # per Monte Carlo draw; these are risk estimates, not pass/fail outcomes.
+    (
+        concept,
+        design_verification,
+        manufacturing,
+        integration,
+        implementation_verification,
+        operation_setup,
+        operation_execution,
+    ) = q.T
     # An OR gate fails unless all its inputs succeed: q_gate = 1 - product(1-q).
-    design_failure = 1 - (1 - q[:, 0]) * (1 - q[:, 1])
-    implementation_failure = 1 - (1 - q[:, 2]) * (1 - q[:, 3]) * (1 - q[:, 4])
-    operation_failure = 1 - (1 - q[:, 5]) * (1 - q[:, 6])
+    design_failure = 1 - (1 - concept) * (1 - design_verification)
+    implementation_failure = (
+        1 - (1 - manufacturing) * (1 - integration) * (1 - implementation_verification)
+    )
+    operation_failure = 1 - (1 - operation_setup) * (1 - operation_execution)
     top_failure = 1 - (1 - design_failure) * (1 - implementation_failure) * (
         1 - operation_failure
     )

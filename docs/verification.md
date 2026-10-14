@@ -1,5 +1,21 @@
 # Verification
 
+## Readability refactor — October 13, 2026
+
+- Baseline public suite: **33 passed, 1 skipped**. Refactored suite:
+  **34 passed, 1 skipped**, including a new calculation/report boundary test.
+  The skip still requires the restricted historical workbook.
+- Nine numerical cases (single rater, multiple raters, and an excluded indicator,
+  each with three evidence settings) match the pre-refactor arrays and tables
+  exactly using 5,000 prior draws, 1,500 posterior draws, and seed 17.
+- Five invalid-input cases retain their original exception types and messages.
+- Integration-run exports match in all five worksheet schemas and stable values,
+  YAML settings, and stable JSON metadata. All twelve PNGs are byte-identical.
+  Run timestamps, paths, and input-file fingerprints are excluded from comparison.
+- Verification loaded this checkout's flattened package through an isolated
+  local import mapping shared by API and CLI subprocesses. This refactor did
+  not rerun wheel installation or the optional MATLAB comparison.
+
 ## Current audit — October 3, 2026
 
 The public suite passed **33 tests, with 1 skipped** in both the editable

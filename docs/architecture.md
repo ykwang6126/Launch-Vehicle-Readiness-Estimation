@@ -14,6 +14,21 @@ Both `python -m lvreadiness` and the Python API call `run_analysis` in
 [`pipeline.py`](../src/pipeline.py). See the [source guide](../src/README.md)
 for each module's responsibility.
 
+Inside `run_analysis`, validation builds the inputs, `compute_analysis` performs
+the numerical work, and `generate_report` writes the completed results.
+`ComputedAnalysis` gives the calculation/report boundary named, typed fields
+instead of dictionary keys. The public `AnalysisResult` and exported schemas
+remain the same. Report helpers separately build RunInfo, configuration, and
+provenance metadata; none consume random draws.
+
+Validation has three stages: `_read_workbook_settings`,
+`_prepare_assessment_rows`, and `_build_rater_profiles`. They run in that order
+to preserve the first reported error and the original rater ordering.
+
+Full sample matrices use `TOP_NODE_INDEX` for the system column. The shorter
+four-column output of `fault_tree_nodes` uses `TREE_TOP_INDEX`. These indices
+are derived from the ordered names in `config.py`, not interchangeable numbers.
+
 `AnalysisResult` contains:
 
 | Field | Contents |

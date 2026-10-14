@@ -35,6 +35,11 @@ BRANCHES = (
 )
 BASIC_EVENTS = ("q_C", "q_Vd", "q_M", "q_I", "q_Vi", "q_S", "q_E")
 NODES = BASIC_EVENTS + ("q_dsgn", "q_impl", "q_op", "q_top")
+# Name the system column explicitly: full samples also contain component columns,
+# whereas fault_tree_nodes returns only the four combined-node columns.
+TOP_NODE_INDEX = NODES.index("q_top")
+TREE_NODES = NODES[len(BASIC_EVENTS):]
+TREE_TOP_INDEX = TREE_NODES.index("q_top")
 
 
 @dataclass(frozen=True)

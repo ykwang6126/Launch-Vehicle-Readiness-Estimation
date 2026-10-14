@@ -6,6 +6,7 @@ import re
 import numpy as np
 import pandas as pd
 from matplotlib.figure import Figure
+from matplotlib.axes import Axes
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from scipy.stats import beta
 
@@ -13,7 +14,7 @@ from .config import COMPONENTS
 from .updating import posterior_weights
 
 
-def _figure() -> tuple:
+def _figure() -> tuple[Figure, Axes]:
     """Create a figure that can be saved without opening a desktop window."""
     figure = Figure(figsize=(8, 5), layout="constrained")
     FigureCanvasAgg(figure)
@@ -34,12 +35,16 @@ def plot_results(
     pools: pd.DataFrame,
     prior: np.ndarray,
     posterior: np.ndarray,
-    legacy_prior: np.ndarray,
+    average_score_prior: np.ndarray,
     n_test: int,
     k_fail: int,
     directory: Path,
 ) -> None:
-    """Export profile mixtures and top-event prior/posterior/likelihood plots."""
+    """Export profile mixtures and top-event prior/posterior/likelihood plots.
+
+    prior, posterior, and average_score_prior are one-dimensional system failure
+    samples. Component curves use success-Beta parameters from the profile table.
+    """
     directory.mkdir(exist_ok=False)
     probability_grid = np.linspace(0.001, 0.999, 1500)
     # Seven component plots show individual success priors and their mixture.
@@ -102,16 +107,16 @@ def plot_results(
             likelihood_grid = np.linspace(0, 1, 2000)
             # Reuse the likelihood formula, then normalize its area over q for
             # display. This curve is a likelihood, not a posterior density.
-            pooled_density = posterior_weights(likelihood_grid, n_test, k_fail)
+            likelihood_weights = posterior_weights(likelihood_grid, n_test, k_fail)
             # numpy 1.x and 2.x compatibility.
             likelihood_area = (
-                np.trapezoid(pooled_density, likelihood_grid)
+                np.trapezoid(likelihood_weights, likelihood_grid)
                 if hasattr(np, "trapezoid")
-                else np.trapz(pooled_density, likelihood_grid)
+                else np.trapz(likelihood_weights, likelihood_grid)
             )
             axes.plot(
                 likelihood_grid,
-                pooled_density / likelihood_area,
+                likelihood_weights / likelihood_area,
                 "k-",
                 lw=2,
                 label="Normalized likelihood",
@@ -125,7 +130,7 @@ def plot_results(
         _save(figure, directory, name)
     figure, axes = _figure()
     axes.hist(
-        legacy_prior,
+        average_score_prior,
         bins=200,
         density=True,
         alpha=0.5,
