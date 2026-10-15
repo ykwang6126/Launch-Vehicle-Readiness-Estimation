@@ -8,11 +8,13 @@ import sys
 import numpy as np
 import openpyxl
 import pandas as pd
+import pytest
 
 from lvreadiness import run_analysis
 
 
-def test_pipeline_reproducibility_exports_and_cli(synthetic_workbook, tmp_path):
+@pytest.mark.parametrize("launcher", ["module", "console"])
+def test_pipeline_reproducibility_exports_and_cli(synthetic_workbook, tmp_path, launcher):
     """Verify identical seeded results, separate run folders, exports, and CLI errors."""
     first = run_analysis(synthetic_workbook, tmp_path / "runs", 3000, 1000, 1)
     second = run_analysis(synthetic_workbook, tmp_path / "runs", 3000, 1000, 1)
@@ -40,11 +42,16 @@ def test_pipeline_reproducibility_exports_and_cli(synthetic_workbook, tmp_path):
         metadata["InputMode"] == "linear_pool"
         and metadata["RandomGenerator"] == "PCG64"
     )
+    # Exercise the installed entry-point metadata as well as python -m.
+    launch = [sys.executable, "-m", "lvreadiness"] if launcher == "module" else [
+        sys.executable, "-c",
+        "from importlib.metadata import distribution; "
+        "entry = next(e for e in distribution('lvreadiness').entry_points "
+        "if e.group == 'console_scripts' and e.name == 'lvreadiness'); "
+        "raise SystemExit(entry.load()())",
+    ]
     completed = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "lvreadiness",
+        launch + [
             "run",
             str(synthetic_workbook),
             "--output",
@@ -64,10 +71,7 @@ def test_pipeline_reproducibility_exports_and_cli(synthetic_workbook, tmp_path):
         pd.read_excel(first.paths["results"], sheet_name="NodeSummary"),
     )
     failed = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "lvreadiness",
+        launch + [
             "run",
             str(synthetic_workbook),
             "--output",
@@ -79,3 +83,13 @@ def test_pipeline_reproducibility_exports_and_cli(synthetic_workbook, tmp_path):
         text=True,
     )
     assert failed.returncode == 2 and not (tmp_path / "bad").exists()
+
+
+def test_entry_module_import_has_no_cli_side_effects():
+    """Console entry-point loading must not parse the importing process's argv."""
+    completed = subprocess.run(
+        [sys.executable, "-c", "import lvreadiness.__main__", "--invalid-option"],
+        capture_output=True, text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout == completed.stderr == ""

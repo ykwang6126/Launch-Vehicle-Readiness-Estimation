@@ -31,7 +31,7 @@ from .pooling import sample_components, sample_averaged_scores, summarize_pools
 from .priors import build_priors
 from .summary import summarize_nodes, pooling_comparison
 from .updating import posterior_weights, resample_joint, weighted_moments
-from .validation import validate_input, validate_run_options
+from .input_validation import validate_input, validate_run_options
 
 
 @dataclass
@@ -103,7 +103,7 @@ def run_analysis(
     uses different random samplers; identical seeds do not imply identical draws.
     """
 
-    # 1. Validate run options in validation.py.
+    # 1. Validate run options in input_validation.py.
     # n_prior/n_posterior are Monte Carlo sample counts, not numbers of raters.
     validate_run_options(n_prior, n_posterior, seed)
     input_path = Path(input_path).resolve()

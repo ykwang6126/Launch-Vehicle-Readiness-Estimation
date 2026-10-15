@@ -30,8 +30,9 @@ python3 -m venv .venv
 .venv/bin/python -m lvreadiness run examples/synthetic_demo/Inputs_sheet.xlsx --output outputs --seed 1
 ```
 
-Install once per environment. **After pulling the flattened `src` layout,
-rerun the installation command** so the package mapping is updated.
+Install once per environment. **After pulling the flattened `src` layout or
+the consolidated CLI, rerun the installation command** so the package mapping
+and `lvreadiness` console entry point are updated.
 MATLAB is not needed for Python analyses.
 
 ## Inputs and results

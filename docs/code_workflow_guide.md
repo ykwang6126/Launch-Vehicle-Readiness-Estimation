@@ -1,6 +1,6 @@
 # LVReadiness: code workflow guide
 
-Based on GitHub branch **review/readability-audit**, inspected October 9, 2026. [Source repository](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/tree/review/readability-audit).
+Based on GitHub branch **review/readability-audit**, inspected October 15, 2026. [Source repository](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/tree/review/readability-audit).
 
 The program converts assessment scores into uncertain component success probabilities, combines component failure probabilities into a system failure probability, and updates that uncertainty using observed test results.
 
@@ -8,22 +8,22 @@ The program converts assessment scores into uncertain component success probabil
 
 ```text
 Command line: python -m lvreadiness run INPUT.xlsx --output outputs
-             __main__.py → cli.main() → pipeline.run_analysis()
+             __main__.main() → pipeline.run_analysis()
 
 Python API:   from lvreadiness import run_analysis
              run_analysis("INPUT.xlsx", "outputs") → same pipeline
 ```
 
-The files under `src/` are modules: the pipeline calls their functions; it does not launch each file as a separate script. `config.py` supplies constants and `Settings`. `__init__.py` exposes the public API. Defaults are 200,000 prior draws, 50,000 posterior draws, and seed 1.
+The files under `src/` are modules: the pipeline calls their functions; it does not launch each file as a separate script. `config.py` supplies constants and `Settings`. `__init__.py` preserves the public API. The CLI now lives in `__main__.py`; the installed `lvreadiness` command calls the same `main` function. The execution guard prevents an import from starting the CLI. Defaults are 200,000 prior draws, 50,000 posterior draws, and seed 1.
 
 ## 2. Full execution flow
 
 ```mermaid
 flowchart TD
     A[CLI or Python API] --> B[pipeline.run_analysis]
-    B --> C[validation.py: check run options]
+    B --> C[input_validation.py: check run options]
     C --> D[io.py: read MATLAB_Input worksheet]
-    D --> E[validation.py: clean data and build rater profiles]
+    D --> E[input_validation.py: clean data and build rater profiles]
     E --> F[priors.py: add Beta parameters and rater weights]
     F --> G[pooling.py: summarize component mixtures]
     G --> H[pooling.py: sample seven component failure probabilities]
@@ -45,14 +45,14 @@ Let **R** be the number of component–rater profiles, **N** the prior draw coun
 
 | Step | Module / function called | What happens and what comes out |
 |---:|---|---|
-| 1 | `validation.validate_run_options` | Require positive integer N and M, and a nonnegative integer seed. Resolve the workbook path. |
+| 1 | `input_validation.validate_run_options` | Require positive integer N and M, and a nonnegative integer seed. Resolve the workbook path. |
 | 2 | `io.read_input` | Read stored Excel values from `MATLAB_Input`; check file, sheet, and headers. Return a raw DataFrame. |
-| 3 | `validation.validate_input` | Check settings and identifiers; standardize names; exclude “Unable to assess” indicators from scores; require scored T and O indicators per profile. Average T/O scores separately. Return cleaned rows, **R × 8** profiles, `Settings`, and excluded Excel row numbers. |
+| 3 | `input_validation.validate_input` | Check settings and identifiers; standardize names; exclude “Unable to assess” indicators from scores; require scored T and O indicators per profile. Average T/O scores separately. Return cleaned rows, **R × 8** profiles, `Settings`, and excluded Excel row numbers. |
 | 4 | `priors.build_priors` → `parameters` | Map scores into Beta parameters; assign equal weights within each component. Return **R × 16** profiles. |
 | 5 | `pooling.summarize_pools` → `mixture_moments` | Report each component's mixture mean and within/between-rater variance. Return seven pool-summary rows. Moment-matched Betas are reporting approximations. |
 | 6 | `pooling.sample_components` | Create seeded PCG64 generator in the pipeline. For each component and draw, select a rater, sample success `p` from its Beta, and store failure `q = 1 - p`. Return **N × 7**. |
 | 7 | `fault_tree.fault_tree_nodes` | Compute three branch failures and `q_top`: **N × 4**. Pipeline joins these to the seven component columns, giving **N × 11** prior samples. |
-| 8 | `updating.posterior_weights` → `validation.validate_evidence` | Use each prior `q_top` and observed tests/failures to calculate a normalized likelihood weight. Return **N** weights. |
+| 8 | `updating.posterior_weights` → `input_validation.validate_evidence` | Use each prior `q_top` and observed tests/failures to calculate a normalized likelihood weight. Return **N** weights. |
 | 9 | `updating.resample_joint` | Select M complete prior rows with replacement using those weights. Return **M × 11** posterior samples, M source indices, and effective sample size (ESS). |
 | 10 | `updating.weighted_moments`; `summary.summarize_nodes` | Calculate weighted posterior diagnostics and prior/posterior statistics. `NodeSummary` has **11 × 19** entries. Requirement probabilities apply only to `q_top`. |
 | 11 | Comparison calls below | Calculate the older average-score method separately and compare it with the main method. Return two `PoolingComparison` rows. |
@@ -163,8 +163,24 @@ On invalid input, functions raise errors; the CLI catches `ValueError` and `OSEr
 ## Source links
 
 - [Pipeline and call order](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/pipeline.py)
-- [Input validation](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/validation.py), [prior construction](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/priors.py), [pooling and sampling](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/pooling.py)
+- [Input validation](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/input_validation.py), [prior construction](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/priors.py), [pooling and sampling](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/pooling.py)
 - [Fault tree](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/fault_tree.py), [Bayesian update](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/updating.py)
 - [Summaries](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/summary.py), [plots](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/plotting.py), [input/output](https://github.com/ykwang6126/Launch-Vehicle-Readiness-Estimation/blob/review/readability-audit/src/io.py)
 
 Mermaid diagrams require a compatible Markdown viewer. The numbered table and equations explain the same process without diagram rendering.
+
+## Entry points and current source locations
+
+`cli.py` has been merged into `__main__.py`. `validation.py` is now
+`input_validation.py`; source and test imports use the new name.
+`__init__.py` remains the package API boundary, preserving existing API calls.
+Numerical computation and report generation remain separate in `pipeline.py`.
+
+- [`__init__.py` lines 1–8](../src/__init__.py#L1): public exports.
+- [`__main__.py:main` lines 10–37](../src/__main__.py#L10): current function location.
+- [`pipeline.py:run_analysis` lines 93–123](../src/pipeline.py#L93): current function location.
+- [`pipeline.py:compute_analysis` lines 126–215](../src/pipeline.py#L126): current function location.
+- [`pipeline.py:generate_report` lines 320–374](../src/pipeline.py#L320): current function location.
+- [`input_validation.py:validate_run_options` lines 60–78](../src/input_validation.py#L60): current function location.
+- [`input_validation.py:validate_evidence` lines 81–94](../src/input_validation.py#L81): current function location.
+- [`input_validation.py:validate_input` lines 328–353](../src/input_validation.py#L328): current function location.

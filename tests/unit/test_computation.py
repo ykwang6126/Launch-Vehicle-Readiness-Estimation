@@ -5,7 +5,7 @@ import pandas as pd
 
 from lvreadiness.config import NODES, TOP_NODE_INDEX
 from lvreadiness.pipeline import ComputedAnalysis, compute_analysis
-from lvreadiness.validation import validate_input
+from lvreadiness.input_validation import validate_input
 
 
 def test_computation_keeps_inputs_and_joint_samples(assessment, monkeypatch):

@@ -3,7 +3,7 @@
 import warnings
 import numpy as np
 
-from .validation import validate_evidence
+from .input_validation import validate_evidence
 
 
 def posterior_weights(q: np.ndarray, n_test: int, k_fail: int) -> np.ndarray:

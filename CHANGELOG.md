@@ -2,6 +2,9 @@
 
 ## Unreleased — readability audit
 
+- Rename `validation.py` to `input_validation.py` and update all internal imports.
+- Consolidate CLI parsing into `__main__.py`, preserving module execution, the installed command, and the package API.
+- Update workflow guides, flowcharts, and source line references for the consolidated layout.
 - Put all source modules directly under `src`, preserving the installed `lvreadiness` package and CLI.
 - Use clearer local names, explain array shapes and calculations, and format Python source/tests/tools consistently.
 - Rewrite documentation with GitHub-rendered equations and short folder guides.

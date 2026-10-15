@@ -12,7 +12,7 @@ from lvreadiness.pooling import (
 from lvreadiness.priors import parameters, build_priors
 from lvreadiness.summary import summarize_nodes
 from lvreadiness.updating import posterior_weights, resample_joint, weighted_moments
-from lvreadiness.validation import validate_input
+from lvreadiness.input_validation import validate_input
 
 
 def test_mapping_reference():

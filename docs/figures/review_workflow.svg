@@ -180,7 +180,7 @@ z
    </g>
    <g id="text_3">
     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; fill: #172b40" transform="translate(111.93533 114.634252)">Read and validate</text>
-    <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; fill: #172b40" transform="translate(105.041423 129.583298)">io.py + validation.py</text>
+    <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; fill: #172b40" transform="translate(105.041423 129.583298)">io.py + input_validation.py</text>
    </g>
    <g id="text_4">
     <text style="font-size: 10.5px; font-family: 'DejaVu Sans'; fill: #172b40" transform="translate(93.241228 170.074252)">Component-rater profiles</text>

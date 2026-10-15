@@ -18,14 +18,14 @@ This is a full coverage walkthrough; unresolved details become follow-up items.
 | --- | --- | --- |
 | 0-20 | `docs/mathematical_model.md`, pooling section; `docs/exact_moments.md` | Density pooling; within/between variance; purpose and derivation of exact moments |
 | 20-30 | `src/config.py` | Mapping values, lifecycle factors, seven components, eleven-node order |
-| 30-45 | `src/io.py`, `src/validation.py` | One-sheet input; settings; profiles; excluded rows; open Boolean issue |
+| 30-45 | `src/io.py`, `src/input_validation.py` | One-sheet input; settings; profiles; excluded rows; open Boolean issue |
 | 45-55 | `src/priors.py` | Work through T=3, O=2.5, CDR by hand |
 | 55-70 | `src/pooling.py` | Equal weights; mixture sampling; exact moments; comparison-only methods |
 | 70-80 | `src/fault_tree.py` | OR equations; zero/one cases; independence assumptions |
 | 80-95 | `src/updating.py` | Likelihood; log weights; full-row resampling; ESS |
 | 95-105 | `src/summary.py`, `src/plotting.py` | Failure versus success; percentiles; Pmeet; twelve figures |
 | 105-115 | `src/pipeline.py` | Calculation order; RNG; settings; metadata; exports |
-| 115-120 | `src/cli.py`, `src/__init__.py`, `src/__main__.py` | API/CLI entry points; defaults; error status; assign remaining work |
+| 115-120 | `src/__main__.py`, `src/__init__.py` | API/CLI entry points; defaults; error status; assign remaining work |
 
 ## Review method
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from lvreadiness.validation import InputError, validate_input, validate_run_options
+from lvreadiness.input_validation import InputError, validate_input, validate_run_options
 from lvreadiness.io import read_input
 
 

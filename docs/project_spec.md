@@ -45,10 +45,10 @@ verifies the implementation, not calibration for a new vehicle.
 
 | Requirement | Implementation |
 | --- | --- |
-| Spec 2–3: workbook and profile validation | `io.py`, `validation.py` |
+| Spec 2–3: workbook and profile validation | `io.py`, `input_validation.py` |
 | Spec 4; paper equations 5–15: prior mapping | `config.py`, `priors.py` |
 | Spec 5: equal-weight mixture | `pooling.py` |
 | Spec 5; paper equations 1–4: fault tree | `fault_tree.py` |
 | Spec 6; paper equations 19–22: update | `updating.py` |
-| Spec 7–9: workflow, summaries, exports | `pipeline.py`, `summary.py`, `io.py`, `plotting.py`, `cli.py` |
+| Spec 7–9: workflow, summaries, exports | `pipeline.py`, `summary.py`, `io.py`, `plotting.py`, `__main__.py` |
 | Spec 10: verification | `tests/`, `tools/verify_matlab.py` |

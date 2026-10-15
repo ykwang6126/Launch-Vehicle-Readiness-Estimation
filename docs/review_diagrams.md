@@ -34,7 +34,7 @@ are allowed. Columns shown are a subset of the eleven stored nodes.
 
 | Calculation | Code | Check |
 | --- | --- | --- |
-| T/O category averages | `validation.validate_input` | One component, two raters, one excluded row |
+| T/O category averages | `input_validation.validate_input` | One component, two raters, one excluded row |
 | Success Beta parameters | `priors.parameters` | T=3, O=2.5, CDR: mean 0.924; strength 18.2 |
 | Mixture mean / variance | `pooling.mixture_moments` | Beta(2,8) + Beta(8,2): mean 0.5; variance 0.104545 |
 | Independent OR gates | `fault_tree.fault_tree_nodes` | All zeros; one certain failure; seven q=0.1 give q_top=0.5217031 |

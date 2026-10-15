@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 
 from lvreadiness.io import read_input
-from lvreadiness.validation import validate_input
+from lvreadiness.input_validation import validate_input
 from lvreadiness.priors import build_priors
 from lvreadiness.pooling import success_product_moments
 

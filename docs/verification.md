@@ -124,6 +124,15 @@ $env:LVREADINESS_HISTORICAL_INPUT = "C:\research\Inputs_sheet.xlsx"
 
 ## Limits
 
+- The October 15, 2026 layout refactor passed 36 tests; the optional historical
+  workbook test was skipped. Against the pre-refactor branch, all numerical
+  computation fields matched exactly at 200,000 prior and 50,000 posterior
+  draws with seed 1 on the fictional example. At 3,000/1,000 draws, numerical
+  report tables and all twelve PNG figures also matched exactly in the same
+  environment. Run timestamps, output paths, and code provenance vary by run.
+- Both module execution and the installed console entry-point callable were
+  tested for successful analysis and invalid sample-count handling. Importing
+  `lvreadiness.__main__` was checked to have no command-line side effects.
 - MATLAB and Python have different samplers; identical seeds do not imply identical draws.
 - Shared-draw tests check deterministic calculations; independent runs use Monte Carlo tolerances.
 - Exact repeatability across dependency versions or platforms is not established.

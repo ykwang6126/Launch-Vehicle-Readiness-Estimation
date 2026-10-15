@@ -10,7 +10,7 @@ import pandas as pd
 import yaml
 from openpyxl import load_workbook
 
-from .validation import InputError
+from .input_validation import InputError
 
 
 def read_input(path: str | Path) -> pd.DataFrame:
@@ -39,7 +39,7 @@ def read_input(path: str | Path) -> pd.DataFrame:
         ):
             raise InputError("MATLAB_Input has duplicate column names.")
 
-        # 5. Convert raw worksheet rows into a pandas table for validation.py.
+        # 5. Convert raw worksheet rows into a pandas table for input_validation.py.
         raw_input = pd.DataFrame(rows[1:], columns=headers)
         return raw_input.loc[:, [c is not None for c in raw_input.columns]]
     finally:
