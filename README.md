@@ -73,6 +73,39 @@ Defaults: 200,000 prior draws, 50,000 posterior draws, seed 1.
 Use `--n-prior`, `--n-posterior`, and `--seed` to change these in the CLI.
 Phase, test counts, and threshold are read from Excel.
 
+## Architecture and source files
+
+Python modules live directly in `src/`. The package mapping in
+[`pyproject.toml`](pyproject.toml) installs them as `lvreadiness`, preserving
+the Python API and command names.
+
+Both `python -m lvreadiness` and the installed `lvreadiness` command call
+`main` in [`src/__main__.py`](src/__main__.py). Command-line parsing now lives
+there; the former `cli.py` module has been removed. The small
+[`src/__init__.py`](src/__init__.py) retains the public exports
+`run_analysis`, `AnalysisResult`, and `__version__`.
+
+| Source file | Responsibility |
+| --- | --- |
+| [`input_validation.py`](src/input_validation.py) | Validate run options, workbook settings, assessment rows, and evidence; build component–rater profiles. Replaces `validation.py`. |
+| [`pipeline.py`](src/pipeline.py) | Coordinate validation, numerical computation, and report generation through `run_analysis`. |
+| [`io.py`](src/io.py) | Read the `MATLAB_Input` worksheet and export Excel, YAML, and JSON files. |
+| [`config.py`](src/config.py) | Define defaults, score mappings, lifecycle factors, component/node order, and `Settings`. |
+| [`priors.py`](src/priors.py), [`pooling.py`](src/pooling.py) | Build success-Beta priors, pool raters, and sample component failure probabilities. |
+| [`fault_tree.py`](src/fault_tree.py), [`updating.py`](src/updating.py) | Combine component failures and update complete sample rows using test evidence. |
+| [`summary.py`](src/summary.py), [`plotting.py`](src/plotting.py) | Calculate node statistics and method comparisons; save the twelve diagnostic figures. |
+
+Within `pipeline.py`, `compute_analysis` performs the numerical work without
+writing files and returns a `ComputedAnalysis`. `generate_report` uses those
+results to create the run folder, figures, tables, and provenance files.
+`run_analysis` returns the existing `AnalysisResult` with tables, paths,
+samples, weights, and diagnostics. The refactor preserves the calculation
+order, seeded results, and exported schemas.
+
+See the [workflow guide](docs/code_workflow_guide.md) for the execution steps
+and the [source-code flowcharts](src/source_code_flowcharts.md) for diagrams
+and current source-line references.
+
 ## Repository guide
 
 | Folder | Contents |
