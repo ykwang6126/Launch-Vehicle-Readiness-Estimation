@@ -4,6 +4,30 @@ Based on GitHub branch **review/readability-audit**, inspected October 15, 2026.
 
 The program converts assessment scores into uncertain component success probabilities, combines component failure probabilities into a system failure probability, and updates that uncertainty using observed test results.
 
+## What each source file does
+
+The `src/` folder contains these Python files:
+
+| File | What it does |
+| --- | --- |
+| [`__init__.py`](../src/__init__.py) | Makes the main function, result class, and version available through `import lvreadiness`. |
+| [`__main__.py`](../src/__main__.py) | Reads command-line arguments, starts the analysis, and prints results or errors. |
+| [`config.py`](../src/config.py) | Defines default settings, score mappings, lifecycle factors, and component/node names. |
+| [`input_validation.py`](../src/input_validation.py) | Checks input values, cleans assessment rows, and groups scores by component and rater. |
+| [`io.py`](../src/io.py) | Reads the Excel input and writes the Excel, YAML, and JSON output files. |
+| [`priors.py`](../src/priors.py) | Converts technical and organizational scores into Beta probability distributions. |
+| [`pooling.py`](../src/pooling.py) | Combines different raters' distributions and samples component failure probabilities. |
+| [`fault_tree.py`](../src/fault_tree.py) | Combines component failure probabilities into branch and overall system failure probabilities. |
+| [`updating.py`](../src/updating.py) | Uses observed test results to weight prior samples and generate posterior samples. |
+| [`summary.py`](../src/summary.py) | Calculates statistics, requirement probabilities, and comparisons between pooling methods. |
+| [`plotting.py`](../src/plotting.py) | Creates the twelve diagnostic figures. |
+| [`pipeline.py`](../src/pipeline.py) | Coordinates the complete workflow: validation, calculations, reporting, and returned results. |
+
+The folder also includes two documentation files:
+
+- [`README.md`](../src/README.md): explains the source layout and suggested reading order.
+- [`source_code_flowcharts.md`](../src/source_code_flowcharts.md): shows execution flowcharts with source-line references.
+
 ## 1. Where execution starts
 
 ```text
