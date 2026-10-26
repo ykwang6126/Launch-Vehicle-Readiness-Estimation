@@ -6,6 +6,14 @@ LVReadiness is research software developed by Yu-Kai Wang, a Ph.D. candidate in 
 
 The goal is to support safety and reliability decisions before large operational datasets exist: make assessment assumptions explicit, retain disagreement between assessors, and show how test results change the estimated risk.
 
+## Single-script version
+
+The `review/singularaudit` branch includes the complete analysis in [Singular Python Script](Singular%20Python%20Script/README.md). It contains one readable Python script, its input workbooks, an input/output flowchart, dependency requirements, and setup instructions.
+
+Start with the [single-script README](Singular%20Python%20Script/README.md) to install the libraries and run it. Each run saves an Excel workbook, twelve diagnostic plots in PNG/SVG format, and a JSON record of the settings. Generated output folders are excluded from Git.
+
+The existing `lv-readiness/` package remains available below.
+
 ## How it works
 
 1. **Assess readiness:** enter technical and organizational scores for seven areas spanning design, verification, manufacturing, integration, and operations.
@@ -31,7 +39,8 @@ Estimated mission-success probability is **1 − mean system failure probability
 | Your interest | Recommended page |
 | --- | --- |
 | Understand the method visually | [Workflow, pooling, and Bayesian updating diagrams](lv-readiness/docs/review_diagrams.md) |
-| Run the Python example | [Installation and quick start](lv-readiness/README.md) |
+| Run the standalone Python script | [Single-script setup and guide](Singular%20Python%20Script/README.md) |
+| Run the package example | [Installation and quick start](lv-readiness/README.md) |
 | Read the equations and assumptions | [Mathematical model](lv-readiness/docs/mathematical_model.md) |
 | Prepare inputs or interpret outputs | [Input and output guide](lv-readiness/docs/input_output.md) |
 | Explore the implementation | [Source code guide](lv-readiness/src/README.md) |
