@@ -281,75 +281,77 @@ expected_branches = [
     "Design", "Design", "Implementation", "Implementation",
     "Implementation", "Operation", "Operation",
 ]
-# MATLAB lines 394-398: start an empty collection of profiles.
-profile_rows = []
-
-# Work through one component at a time, then one rater within that component.
-# zip pairs each component with its expected branch, in list order.
-for component, expected_branch in zip(component_order, expected_branches):
-
-    # 1. Select this component's assessments. MATLAB lines 399-401.
+# Check the assessments before calculating the profile averages.
+# MATLAB lines 384-388: each component must belong to its expected branch.
+for component_index in range(len(component_order)):
+    component = component_order[component_index]
+    expected_branch = expected_branches[component_index]
     component_rows = input_table.loc[input_table["Component"] == component]
 
-    # 2. Check the branch on each assessment. MATLAB lines 384-388.
     for branch in component_rows["Branch"]:
         if branch.lower() != expected_branch.lower():
             raise ValueError(f"Wrong Branch for component {component}.")
 
-    # 3. Select each rater's assessments. MATLAB lines 402-405.
-    # unique() lists each person once, in their original worksheet order.
+# MATLAB lines 406-408: a rater cannot assess the same indicator twice
+# within the same component. Compare indicator names in lowercase.
+assessment_names = input_table[["Component", "RaterID", "Indicator"]].copy()
+assessment_names["Indicator"] = assessment_names["Indicator"].str.lower()
+duplicate_rows = assessment_names.duplicated()
+if duplicate_rows.any():
+    duplicate = input_table.loc[duplicate_rows].iloc[0]
+    component = duplicate["Component"]
+    rater_id = duplicate["RaterID"]
+    raise ValueError(f"Duplicate indicator within {component} / {rater_id}.")
+
+# MATLAB lines 409-419: warn about unassessed rows and check usable scores.
+excluded_rows = input_table.loc[input_table["Unassessed"] == True]
+if not excluded_rows.empty:
+    excel_rows = excluded_rows["SourceRow"].tolist()
+    warnings.warn(f"Excluded unassessed indicators at Excel rows {excel_rows}.")
+
+scored_input = input_table.loc[input_table["Unassessed"] == False]
+bad_rows = []
+for row_index in scored_input.index:
+    score = scored_input.loc[row_index, "Z"]
+    if not np.isfinite(score) or score < 0 or score > 4:
+        excel_row = int(scored_input.loc[row_index, "SourceRow"])
+        bad_rows.append(excel_row)
+
+if len(bad_rows) > 0:
+    raise ValueError(f"Invalid Z at Excel rows {bad_rows}. Scores must be between 0 and 4.")
+
+# Build one summary row for each component and rater. MATLAB lines 394-424.
+profile_rows = []
+for component_index in range(len(component_order)):
+    component = component_order[component_index]
+    branch = expected_branches[component_index]
+    component_rows = input_table.loc[input_table["Component"] == component]
     rater_ids = component_rows["RaterID"].unique()
+
     for rater_id in rater_ids:
+        # Select this person's assessments and keep only their scored rows.
         rater_rows = component_rows.loc[component_rows["RaterID"] == rater_id]
-
-        # 4. Reject repeated indicator names. MATLAB lines 406-408.
-        indicator_names = rater_rows["Indicator"].str.lower()
-        if indicator_names.duplicated().any():
-            raise ValueError(f"Duplicate indicator within {component} / {rater_id}.")
-
-        # 5. Separate scored and unassessed rows. MATLAB lines 409-416.
-        excluded_rows = rater_rows.loc[rater_rows["Unassessed"] == True]
         scored_rows = rater_rows.loc[rater_rows["Unassessed"] == False]
 
-        if not excluded_rows.empty:
-            excel_rows = excluded_rows["SourceRow"].tolist()
-            warnings.warn(
-                f"Excluded unassessed indicators in {component} / {rater_id} "
-                f"at Excel rows {excel_rows}.", stacklevel=1,
-            )
-
-        # 6. Check one score at a time. MATLAB lines 417-419.
-        # Each score must be a finite number between 0 and 4.
-        bad_rows = []
-        for row_index in scored_rows.index:
-            score = scored_rows.loc[row_index, "Z"]
-            if not np.isfinite(score) or score < 0 or score > 4:
-                excel_row = int(scored_rows.loc[row_index, "SourceRow"])
-                bad_rows.append(excel_row)
-
-        if len(bad_rows) > 0:
-            raise ValueError(f"Invalid Z for {component} / {rater_id} at Excel rows {bad_rows}.")
-
-        # 7. Separate the technical and organizational scores. MATLAB 420-421.
+        # Get the technical and organizational scores separately.
         technical_scores = scored_rows.loc[scored_rows["Cat"] == "T", "Z"]
         organizational_scores = scored_rows.loc[scored_rows["Cat"] == "O", "Z"]
         if technical_scores.empty or organizational_scores.empty:
             raise ValueError(f"{component} / {rater_id} needs at least one T and one O score.")
 
-        # 8. Average each kind of score separately. MATLAB lines 422-424.
         mean_technical_score = technical_scores.mean()
         mean_organizational_score = organizational_scores.mean()
 
-        # 9. Save one summary row for this component and rater.
+        # Save the two averages and the number of rows used.
         profile = {
-            "Branch": expected_branch,
+            "Branch": branch,
             "Component": component,
             "RaterID": rater_id,
             "Z_T": mean_technical_score,
             "Z_O": mean_organizational_score,
             "NInputRows": len(rater_rows),
             "NUsedRows": len(scored_rows),
-            "NExcludedRows": len(excluded_rows),
+            "NExcludedRows": len(rater_rows) - len(scored_rows),
         }
         profile_rows.append(profile)
 
