@@ -805,20 +805,10 @@ plt.close(figure)
 # MATLAB lines 255-264: normalize the likelihood over a plotting grid.
 # This curve shows the test evidence alone; it is not the posterior density.
 failure_grid = np.linspace(0, 1, 2000)
-grid_log_likelihood = np.zeros(len(failure_grid))
-with np.errstate(divide="ignore"):
-    if k_fail > 0:
-        grid_log_likelihood = grid_log_likelihood + k_fail * np.log(failure_grid)
-    if number_of_successes > 0:
-        grid_log_likelihood = grid_log_likelihood + number_of_successes * np.log1p(-failure_grid)
-
-largest_grid_log_likelihood = np.max(grid_log_likelihood)
-if not np.isfinite(largest_grid_log_likelihood):
-    raise ValueError("No plotting grid point supports the test evidence.")
-grid_likelihood = np.exp(grid_log_likelihood - largest_grid_log_likelihood)
+grid_likelihood = failure_grid**k_fail * (1 - failure_grid)**number_of_successes
 likelihood_area = np.trapezoid(grid_likelihood, failure_grid)
 if not np.isfinite(likelihood_area) or likelihood_area <= 0:
-    raise ValueError("Likelihood normalization failed.")
+    raise ValueError("Plotting likelihoods are zero or invalid. Cannot normalize the curve.")
 likelihood_density = grid_likelihood / likelihood_area
 
 # MATLAB lines 266-282: overlay the normalized likelihood curve.

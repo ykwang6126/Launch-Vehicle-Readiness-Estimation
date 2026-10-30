@@ -26,7 +26,7 @@ Keep the input workbook beside the script. The script reads only its `MATLAB_Inp
 7. Build node-summary dictionaries and separately compare the results with averaging scores before constructing distributions.
 8. Save plots, an Excel workbook, and JSON run metadata.
 
-The direct likelihood updates in sections 18 and 20 are easier to read but can round down to zero with many tests. The script checks for zero or invalid likelihood sums. Section 22 uses logarithms for its separate likelihood plotting curve.
+The direct likelihood updates in sections 18 and 20 are easier to read but can round down to zero with many tests. The script checks for zero or invalid likelihood sums. Section 22 uses the same direct formula for its separate plotting curve, normalizes it by area, and checks that the area is finite and positive. These likelihood calculations do not use logarithms or `np.errstate`.
 
 ## Outputs
 

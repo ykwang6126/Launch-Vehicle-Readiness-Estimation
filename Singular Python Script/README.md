@@ -74,7 +74,7 @@ likelihood = q_top**k_fail * (1 - q_top)**number_of_successes
 posterior_weights = likelihood / np.sum(likelihood)
 ```
 
-The code checks the likelihood sum before dividing. With many tests, direct likelihoods can round down to zero; the script stops if the sum is zero or nonfinite. A zero sum can also mean no sampled probability supports the evidence. The supplied example has three tests. Section 22 still uses logarithms to calculate the normalized likelihood curve on its plotting grid; that curve does not update the samples.
+The code checks the likelihood sum before dividing. With many tests, direct likelihoods can round down to zero; the script stops if the sum is zero or nonfinite. A zero sum can also mean no sampled probability supports the evidence. The supplied example has three tests. Section 22 uses the same direct likelihood formula on its plotting grid and divides by the curve area. That curve does not update the samples. It also stops if the area is zero or nonfinite.
 
 ## Outputs
 

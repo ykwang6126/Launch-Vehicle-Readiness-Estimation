@@ -48,7 +48,7 @@ The input checks are grouped into one decision to keep the chart readable. In th
 
 The effective sample size check warns if too few prior samples contribute meaningfully to the posterior. The average-score comparison runs separately; it does not change the primary exact-pool results.
 
-Sections 18 and 20 calculate likelihoods directly as `q**k_fail * (1 - q)**(n_test - k_fail)`. A zero total can mean no sample supports the evidence or that the values rounded down to zero with many tests. Both sections stop on a zero or nonfinite total. Section 22 uses logarithms only to calculate its separate likelihood plotting curve.
+Sections 18 and 20 calculate likelihoods directly as `q**k_fail * (1 - q)**(n_test - k_fail)`. A zero total can mean no sample supports the evidence or that the values rounded down to zero with many tests. Both sections stop on a zero or nonfinite total. Section 22 uses the same direct formula for its plotting curve, normalizing by its numerical area rather than a sum over prior draws. It stops if the area is zero or nonfinite. No logarithms or `np.errstate` are used in these likelihood calculations.
 
 ## 2. Input/output chart
 
