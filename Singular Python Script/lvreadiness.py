@@ -1,5 +1,4 @@
-"""Launch vehicle readiness analysis, rebuilt step by step from MATLAB v13.
-
+"""Launch vehicle readiness analysis, rebuilt as one sigular script.
 Reads MATLAB_Input and runs the Monte Carlo and Bayesian readiness analysis.
 Saves plots, result tables, and the settings used for each run.
 """
@@ -10,9 +9,8 @@ Saves plots, result tables, and the settings used for each run.
 # MATLAB helper functions are written inline here, from top to bottom.
 from datetime import datetime
 from pathlib import Path
-import json
-import re
-import warnings
+import json #need for saving outputs
+import warnings #gives warnings without ending the code
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,11 +20,11 @@ from scipy.stats import beta as beta_distribution
 
 # %% 2. Input and output locations
 # MATLAB lines 19-24: mfilename('fullpath') and fileparts(scriptPath).
-# Resolve paths relative to this file, regardless of where Python is launched.
+# Resolve paths relative to this file, regardless of where Python is launched. Finds folder with the python script.
 script_dir = Path(__file__).resolve().parent
 
 # MATLAB line 26: inputFile = fullfile(scriptDir, "Inputs_sheet.xlsx").
-# Read the workbook beside this script. The sheet is from MATLAB lines 71-72.
+# Read the workbook beside this script. Builds path to the input workbook
 input_file = script_dir / "Inputs_sheet.xlsx"
 input_sheet = "MATLAB_Input"
 
@@ -74,15 +72,7 @@ lambda_levels = np.array([0.7, 1.0, 1.3, 1.6, 2.0])
 # MATLAB lines 51-58: componentOrder; line 60: basicEventOrder.
 # Keep these lists aligned: each component corresponds to one failure event.
 # Names match the MATLAB baseline and its input workbook.
-component_order = [
-    "Concept",
-    "Design Verification",
-    "Manufacturing",
-    "Assembly and Integration",
-    "Impl. Verification",
-    "Operation Setup",
-    "Operation Execution",
-]
+component_order = ["Concept", "Design Verification", "Manufacturing", "Assembly and Integration", "Impl. Verification", "Operation Setup", "Operation Execution",]
 
 basic_event_order = ["q_C", "q_Vd", "q_M", "q_I", "q_Vi", "q_S", "q_E"]
 
@@ -129,9 +119,10 @@ phase_position = phase_levels.index(phase_name)
 lambda_phase = lambda_levels[phase_position]
 
 
-# %% 10. Read the test evidence and required failure probability
+# %% 10. Reads and validates the test evidence and required failure probability
 # MATLAB line 76 and helpers at lines 566-597.
 # A setting can appear once or repeat, but all its nonblank values must agree.
+settings = []
 for setting_name in ["n_test", "k_fail", "q_req"]:
     if setting_name not in input_table.columns:
         raise ValueError(f"MATLAB_Input is missing column: {setting_name}")
@@ -147,13 +138,10 @@ for setting_name in ["n_test", "k_fail", "q_req"]:
         raise ValueError(f"Column {setting_name} must contain one unique value.")
 
     # All nonblank entries agree, so use the first one.
-    setting_value = float(values.iloc[0])
-    if setting_name == "n_test":
-        n_test = setting_value
-    elif setting_name == "k_fail":
-        k_fail = setting_value
-    elif setting_name == "q_req":
-        q_req = setting_value
+    settings.append(float(values.iloc[0]))
+
+# Assign the three values in the same order as the loop above.
+n_test, k_fail, q_req = settings
 
 # MATLAB lines 571-574: check integer counts and probability bounds.
 if n_test < 0 or not n_test.is_integer():
@@ -169,7 +157,7 @@ n_test = int(n_test)
 k_fail = int(k_fail)
 
 
-# %% 11. Clean the assessment rows
+# %% 11. Cleans and checks the assessment rows
 # MATLAB line 77 calls cleanMatlabInput (defined at lines 339-376).
 # MATLAB lines 340-344: check the required assessment columns.
 required_columns = ["Branch", "Component", "Indicator", "Cat", "Z", "RaterID"]
@@ -199,7 +187,7 @@ if input_table.empty:
     raise ValueError("MATLAB_Input has no assessment rows.")
 
 # MATLAB line 361 calls canonicalizeComponentNames (lines 599-619).
-# Read each component name, recognize its spelling, and write the standard name.
+# Read each component name, recognize its spelling, and write the standard name. Standardizes Spelling
 for row_index in input_table.index:
     component_name = input_table.loc[row_index, "Component"]
 
@@ -262,7 +250,7 @@ if unassessed_row_has_score.any():
 input_table["Z"] = pd.to_numeric(input_table["Z"], errors="coerce")
 
 
-# %% 12. Prepare one profile per component and rater
+# %% 12. Turns individual indicator scores into one assessment profile for each component and rater
 # MATLAB line 78 calls buildProfiles (defined at lines 378-428).
 # Average T and O separately for each person and component.
 # MATLAB lines 379-381: require all components and reject unknown names.
@@ -277,10 +265,7 @@ if (input_table["RaterID"] == "").any():
     raise ValueError("RaterID must be filled on every assessment row.")
 
 # MATLAB lines 382-383: expectedBranches, aligned with componentOrder.
-expected_branches = [
-    "Design", "Design", "Implementation", "Implementation",
-    "Implementation", "Operation", "Operation",
-]
+expected_branches = ["Design", "Design", "Implementation", "Implementation", "Implementation", "Operation", "Operation",]
 # Check the assessments before calculating the profile averages.
 # MATLAB lines 384-388: each component must belong to its expected branch.
 for component_index in range(len(component_order)):
@@ -292,7 +277,7 @@ for component_index in range(len(component_order)):
         if branch.lower() != expected_branch.lower():
             raise ValueError(f"Wrong Branch for component {component}.")
 
-# MATLAB lines 406-408: a rater cannot assess the same indicator twice
+# MATLAB lines 406-408: a rater cannot assess the same indicator twice, checks if there is repitition
 # within the same component. Compare indicator names in lowercase.
 assessment_names = input_table[["Component", "RaterID", "Indicator"]].copy()
 assessment_names["Indicator"] = assessment_names["Indicator"].str.lower()
@@ -320,17 +305,18 @@ for row_index in scored_input.index:
 if len(bad_rows) > 0:
     raise ValueError(f"Invalid Z at Excel rows {bad_rows}. Scores must be between 0 and 4.")
 
-# Build one summary row for each component and rater. MATLAB lines 394-424.
+# Build one summary row (technical score and organizational score) for each component and rater. MATLAB lines 394-424.
 profile_rows = []
+# Read the component and its branch from the same position in their lists.
 for component_index in range(len(component_order)):
     component = component_order[component_index]
     branch = expected_branches[component_index]
     component_rows = input_table.loc[input_table["Component"] == component]
-    rater_ids = component_rows["RaterID"].unique()
 
-    for rater_id in rater_ids:
-        # Select this person's assessments and keep only their scored rows.
-        rater_rows = component_rows.loc[component_rows["RaterID"] == rater_id]
+    # groupby gives us one person's ID and all their assessment rows at a time.
+    # sort=False keeps raters in their original worksheet order.
+    for rater_id, rater_rows in component_rows.groupby("RaterID", sort=False):
+        # Leave out assessments marked Unable to assess.
         scored_rows = rater_rows.loc[rater_rows["Unassessed"] == False]
 
         # Get the technical and organizational scores separately.
@@ -359,7 +345,7 @@ for component_index in range(len(component_order)):
 rater_table = pd.DataFrame(profile_rows)
 
 
-# %% 13. Convert the assessment scores into model parameters
+# %% 13. converts each rater profile’s average scores into three model parameters (base mean success probability, multiplier, beta-distribution strength) using the mappings defined in section 4
 # MATLAB lines 80-84: calculate parameters from scores, not Excel formulas.
 # Work through one component/rater profile at a time.
 # .loc[row_index, "column"] reads or writes one cell in the table.
@@ -422,21 +408,20 @@ print(f"Lifecycle phase: {phase_name} -> lambda = {lambda_phase:.2f}")
 print(f"Test evidence: n = {n_test}, k_fail = {k_fail}, q_req = {q_req:.3f}")
 print(f"Assessment rows: {len(input_table)}; component/rater profiles: {len(rater_table)}")
 
-parameter_columns = [
-    "Component", "RaterID", "Z_T", "Z_O", "mu_T", "m_O", "s_O",
-    "mu", "strength", "alpha_p", "beta_p",
-]
+parameter_columns = ["Component", "RaterID", "Z_T", "Z_O", "mu_T", "m_O", "s_O", "mu", "strength", "alpha_p", "beta_p",]
 parameter_table = rater_table[parameter_columns]
 print(parameter_table.to_string(index=False))
 
-# %% 16. Build the component pools and draw prior samples
+# %% 16. combines the rater distributions for each component and generates its prior Monte Carlo samples, before using test evidence.
 # MATLAB lines 99-158. Each column holds one component's failure probabilities.
 # Each row represents one possible combination of component probabilities.
+#ombines the rater distributions for each component and generates that component’s prior probability samples
 number_of_components = len(component_order)
 q = np.zeros((n_prior, number_of_components))
 pool_summary_rows = []
 
 for component_index in range(number_of_components):
+    # 1. Get the profiles for this component.
     component = component_order[component_index]
     belongs_to_component = rater_table["Component"] == component
     component_profiles = rater_table.loc[belongs_to_component]
@@ -445,7 +430,7 @@ for component_index in range(number_of_components):
     if number_of_profiles == 0:
         raise ValueError(f"Component {component} has no usable assessments.")
 
-    # MATLAB lines 116-117: give every profile in this component equal weight.
+    # 2. Give each profile equal weight. MATLAB lines 116-117.
     profile_weight = 1 / number_of_profiles
     weights = np.full(number_of_profiles, profile_weight)
     rater_table.loc[belongs_to_component, "WeightWithinComponent"] = profile_weight
@@ -455,16 +440,19 @@ for component_index in range(number_of_components):
     alphas = component_profiles["alpha_p"].to_numpy()
     betas = component_profiles["beta_p"].to_numpy()
 
-    # MATLAB lines 122-128: calculate the exact mixture mean and variance.
+    # 3. Calculate the pool mean and variance. MATLAB lines 122-128.
+    # With equal weights, a weighted average is just the ordinary mean.
     strengths = alphas + betas
-    profile_variances = alphas * betas / (strengths**2 * (strengths + 1))
-    pool_mean = np.sum(weights * means)
-    within_rater_variance = np.sum(weights * profile_variances)
+    variance_denominator = strengths**2 * (strengths + 1)
+    profile_variances = alphas * betas / variance_denominator
+
+    pool_mean = np.mean(means)
+    within_rater_variance = np.mean(profile_variances)
     differences_from_pool_mean = means - pool_mean
-    between_rater_variance = np.sum(weights * differences_from_pool_mean**2)
+    between_rater_variance = np.mean(differences_from_pool_mean**2)
     pool_variance = within_rater_variance + between_rater_variance
 
-    # MATLAB lines 130-139: a single Beta approximation for reporting only.
+    # 4. Calculate a single Beta approximation. MATLAB lines 130-139.
     # We will sample the original mixture, not this approximation.
     moment_matched_strength = pool_mean * (1 - pool_mean) / pool_variance - 1
     if moment_matched_strength > 0:
@@ -475,8 +463,8 @@ for component_index in range(number_of_components):
         moment_matched_alpha = np.nan
         moment_matched_beta = np.nan
 
-    # MATLAB lines 143-150: select a rater for each sample, then draw from
-    # that rater's Beta distribution. Python counts profiles starting at zero.
+    # 5. Select a profile for each sample, then draw its success probability.
+    # MATLAB lines 143-150. Profile positions start at zero in Python.
     selected_profiles = rng.choice(number_of_profiles, size=n_prior, replace=True, p=weights)
     success_samples = np.zeros(n_prior)
 
@@ -486,15 +474,14 @@ for component_index in range(number_of_components):
         if number_of_draws > 0:
             alpha = alphas[profile_index]
             beta = betas[profile_index]
-            success_samples[uses_this_profile] = rng.beta(alpha, beta, size=number_of_draws)
+            draws = rng.beta(alpha, beta, size=number_of_draws)
+            success_samples[uses_this_profile] = draws
 
     # MATLAB line 151: convert success probabilities into failure probabilities.
     q[:, component_index] = 1 - success_samples
 
-    # MATLAB lines 153-158: save one summary row for this component.
-    technical_scores = component_profiles["Z_T"].to_numpy()
-    organizational_scores = component_profiles["Z_O"].to_numpy()
-    pool_summary_rows.append({
+    # 6. Save this component's summary. MATLAB lines 153-158.
+    component_summary = {
         "BasicEvent": basic_event_order[component_index],
         "Branch": component_profiles.iloc[0]["Branch"],
         "Component": component,
@@ -506,9 +493,10 @@ for component_index in range(number_of_components):
         "MomentMatchedStrength": moment_matched_strength,
         "MomentMatchedAlpha": moment_matched_alpha,
         "MomentMatchedBeta": moment_matched_beta,
-        "MeanZT": np.sum(weights * technical_scores),
-        "MeanZO": np.sum(weights * organizational_scores),
-    })
+        "MeanZT": component_profiles["Z_T"].mean(),
+        "MeanZO": component_profiles["Z_O"].mean(),
+    }
+    pool_summary_rows.append(component_summary)
 
 pool_summary = pd.DataFrame(pool_summary_rows)
 print("\nComponent pool summary:")
@@ -541,30 +529,22 @@ print(f"q_op:   mean = {np.mean(q_operation):.6f}, std = {np.std(q_operation, dd
 print(f"q_top:  mean = {np.mean(q_top):.6f}, std = {np.std(q_top, ddof=0):.6f}")
 
 
-# %% 18. Update the samples using the test evidence
+# %% 18. updates the prior samples using the observed test results, producing posterior samples.
 # MATLAB lines 177-191 and posteriorWeights at lines 438-448.
 # The likelihood is q_top**k_fail * (1 - q_top)**(n_test - k_fail).
-# Logarithms avoid rounding very small likelihoods down to zero.
+# Calculate it directly here, rather than using MATLAB's logarithmic form.
 if not np.isfinite(q_top).all() or (q_top < 0).any() or (q_top > 1).any():
     raise ValueError("Failure-probability samples must be finite and within [0, 1].")
 
-log_likelihood = np.zeros(n_prior)
 number_of_successes = n_test - k_fail
+likelihood = q_top**k_fail * (1 - q_top)**number_of_successes
+total_likelihood = np.sum(likelihood)
 
-# log(0) is -infinity: that sample cannot support the observed evidence.
-# Skip zero-count terms so that 0 * log(0) never occurs.
-with np.errstate(divide="ignore"):
-    if k_fail > 0:
-        log_likelihood = log_likelihood + k_fail * np.log(q_top)
-    if number_of_successes > 0:
-        log_likelihood = log_likelihood + number_of_successes * np.log1p(-q_top)
+# With many tests, direct likelihoods can become too small to represent.
+if not np.isfinite(total_likelihood) or total_likelihood <= 0:
+    raise ValueError("Likelihoods are zero or invalid. Cannot calculate posterior weights.")
 
-largest_log_likelihood = np.max(log_likelihood)
-if not np.isfinite(largest_log_likelihood):
-    raise ValueError("No prior sample supports the supplied test evidence.")
-
-scaled_likelihood = np.exp(log_likelihood - largest_log_likelihood)
-posterior_weights = scaled_likelihood / np.sum(scaled_likelihood)
+posterior_weights = likelihood / total_likelihood
 
 effective_sample_size = 1 / np.sum(posterior_weights**2)
 print(f"\nPosterior effective sample size: {effective_sample_size:.1f} of {n_prior}")
@@ -580,34 +560,29 @@ q_operation_posterior = q_operation[posterior_indices]
 q_top_posterior = q_top[posterior_indices]
 
 
-# %% 19. Summarize the prior and posterior results
+# %% 19. summarizes the prior and posterior samples for all 11 fault-tree nodes: seven components, three branches, and the top event. for the terminal output
 # MATLAB lines 193-199 and buildNodeSummary at lines 490-515.
 node_names = basic_event_order + ["q_dsgn", "q_impl", "q_op", "q_top"]
 prior_nodes = np.column_stack((q, q_design, q_implementation, q_operation, q_top))
-posterior_nodes = np.column_stack((
-    q_posterior, q_design_posterior, q_implementation_posterior,
-    q_operation_posterior, q_top_posterior,
-))
+posterior_nodes = np.column_stack((q_posterior, q_design_posterior, q_implementation_posterior, q_operation_posterior, q_top_posterior,))
 node_summary_rows = []
-
 for node_index in range(len(node_names)):
+    # 1. Get this node's name and its prior and posterior samples.
     node_name = node_names[node_index]
     prior_samples = prior_nodes[:, node_index]
     posterior_samples = posterior_nodes[:, node_index]
 
-    # q_req applies only to the top event; it is not a branch requirement.
-    prior_probability_exceeds = np.nan
-    posterior_probability_exceeds = np.nan
-    prior_probability_meets = np.nan
-    posterior_probability_meets = np.nan
+    # 2. Calculate requirement probabilities only for the top event.
+    # np.nan leaves the other nodes' requirement results blank.
+    prior_exceeds = np.nan
+    posterior_exceeds = np.nan
     if node_name == "q_top":
-        prior_probability_exceeds = np.mean(prior_samples > q_req)
-        posterior_probability_exceeds = np.mean(posterior_samples > q_req)
-        prior_probability_meets = 1 - prior_probability_exceeds
-        posterior_probability_meets = 1 - posterior_probability_exceeds
+        prior_exceeds = np.mean(prior_samples > q_req)
+        posterior_exceeds = np.mean(posterior_samples > q_req)
 
-    # method="hazen" uses MATLAB's percentile convention.
-    node_summary_rows.append({
+    # 3. Build one summary row. Keys are column names; values are results.
+    # method="hazen" matches MATLAB's percentile convention.
+    summary_row = {
         "Node": node_name,
         "PriorNSamples": len(prior_samples),
         "PostNSamples": len(posterior_samples),
@@ -617,19 +592,22 @@ for node_index in range(len(node_names)):
         "PriorP025": np.percentile(prior_samples, 2.5, method="hazen"),
         "PriorP95": np.percentile(prior_samples, 95, method="hazen"),
         "PriorP975": np.percentile(prior_samples, 97.5, method="hazen"),
-        "PriorPexc": prior_probability_exceeds,
-        "PriorPmeet": prior_probability_meets,
+        "PriorPexc": prior_exceeds,
+        "PriorPmeet": 1 - prior_exceeds,
         "PostMean": np.mean(posterior_samples),
         "PostStd": np.std(posterior_samples, ddof=0),
         "PostMedian": np.median(posterior_samples),
         "PostP025": np.percentile(posterior_samples, 2.5, method="hazen"),
         "PostP95": np.percentile(posterior_samples, 95, method="hazen"),
         "PostP975": np.percentile(posterior_samples, 97.5, method="hazen"),
-        "PostPexc": posterior_probability_exceeds,
-        "PostPmeet": posterior_probability_meets,
-    })
+        "PostPexc": posterior_exceeds,
+        "PostPmeet": 1 - posterior_exceeds,
+    }
+    node_summary_rows.append(summary_row)
 
+# Combine the dictionaries into a table with one row per node.
 node_summary = pd.DataFrame(node_summary_rows)
+
 print("\nPrior and posterior summary:")
 print(node_summary.to_string(index=False))
 
@@ -640,18 +618,19 @@ print(node_summary.to_string(index=False))
 # before building one Beta distribution. It is a separate comparison run.
 q_legacy = np.zeros((n_prior, number_of_components))
 
+# 1. Average the scores and calculate one Beta distribution per component.
 for component_index in range(number_of_components):
     component = component_order[component_index]
-    belongs_to_component = rater_table["Component"] == component
-    component_profiles = rater_table.loc[belongs_to_component]
+    component_profiles = rater_table.loc[rater_table["Component"] == component]
 
     mean_technical_score = component_profiles["Z_T"].mean()
     mean_organizational_score = component_profiles["Z_O"].mean()
-    base_mean = np.interp(mean_technical_score, score_levels, mu_t_levels)
-    multiplier = np.interp(mean_organizational_score, score_levels, m_o_levels)
+
+    base_success_probability = np.interp(mean_technical_score, score_levels, mu_t_levels)
+    organizational_multiplier = np.interp(mean_organizational_score, score_levels, m_o_levels)
     base_strength = np.interp(mean_organizational_score, score_levels, s_o_levels)
 
-    mean_success_probability = base_mean * multiplier
+    mean_success_probability = base_success_probability * organizational_multiplier
     if mean_success_probability < 0.01:
         mean_success_probability = 0.01
     elif mean_success_probability > 0.99:
@@ -659,32 +638,34 @@ for component_index in range(number_of_components):
 
     strength = base_strength * lambda_phase
     alpha = mean_success_probability * strength
-    beta = (1 - mean_success_probability) * strength
+    mean_failure_probability = 1 - mean_success_probability
+    beta = mean_failure_probability * strength
+
+    # Draw success probabilities, then convert them to failure probabilities.
     success_samples = rng.beta(alpha, beta, size=n_prior)
     q_legacy[:, component_index] = 1 - success_samples
 
-# Apply the same fault-tree equations to the comparison samples.
+# 2. Apply the same fault-tree equations as section 17.
 q_design_legacy = 1 - (1 - q_legacy[:, 0]) * (1 - q_legacy[:, 1])
-q_implementation_legacy = 1 - (1 - q_legacy[:, 2]) * (1 - q_legacy[:, 3]) * (1 - q_legacy[:, 4])
+q_implementation_legacy = 1 - ((1 - q_legacy[:, 2]) * (1 - q_legacy[:, 3]) * (1 - q_legacy[:, 4]))
 q_operation_legacy = 1 - (1 - q_legacy[:, 5]) * (1 - q_legacy[:, 6])
-q_top_legacy = 1 - (1 - q_design_legacy) * (1 - q_implementation_legacy) * (1 - q_operation_legacy)
+q_top_legacy = 1 - ((1 - q_design_legacy) * (1 - q_implementation_legacy) * (1 - q_operation_legacy))
 
-# Apply the same Bayesian update to the comparison top-event samples.
-legacy_log_likelihood = np.zeros(n_prior)
-with np.errstate(divide="ignore"):
-    if k_fail > 0:
-        legacy_log_likelihood = legacy_log_likelihood + k_fail * np.log(q_top_legacy)
-    if number_of_successes > 0:
-        legacy_log_likelihood = legacy_log_likelihood + number_of_successes * np.log1p(-q_top_legacy)
+# 3. Calculate the likelihood and weights directly, just as in section 18.
+legacy_likelihood = q_top_legacy**k_fail * (1 - q_top_legacy)**number_of_successes
+total_legacy_likelihood = np.sum(legacy_likelihood)
 
-largest_legacy_log_likelihood = np.max(legacy_log_likelihood)
-if not np.isfinite(largest_legacy_log_likelihood):
-    raise ValueError("No comparison sample supports the supplied test evidence.")
-legacy_likelihood = np.exp(legacy_log_likelihood - largest_legacy_log_likelihood)
-legacy_weights = legacy_likelihood / np.sum(legacy_likelihood)
+# Direct likelihoods can round to zero when the number of tests is large.
+if not np.isfinite(total_legacy_likelihood) or total_legacy_likelihood <= 0:
+    raise ValueError("Comparison likelihoods are zero or invalid. Cannot calculate posterior weights.")
+
+legacy_weights = legacy_likelihood / total_legacy_likelihood
+
+# 4. Resample the comparison top-event probabilities using these weights.
 legacy_posterior_indices = rng.choice(n_prior, size=n_posterior, replace=True, p=legacy_weights)
 q_top_legacy_posterior = q_top_legacy[legacy_posterior_indices]
 
+# 5. Save one dictionary row for each method's statistics.
 methods = ["Scores averaged across profiles", "Exact equal-weight linear pool"]
 comparison_priors = [q_top_legacy, q_top]
 comparison_posteriors = [q_top_legacy_posterior, q_top_posterior]
@@ -693,21 +674,22 @@ comparison_rows = []
 for method_index in range(len(methods)):
     prior_samples = comparison_priors[method_index]
     posterior_samples = comparison_posteriors[method_index]
-    comparison_rows.append({
+    comparison_row = {
         "Method": methods[method_index],
         "PriorMean": np.mean(prior_samples),
         "PriorStd": np.std(prior_samples, ddof=0),
         "PriorP95": np.percentile(prior_samples, 95, method="hazen"),
         "PostMean": np.mean(posterior_samples),
         "PostP95": np.percentile(posterior_samples, 95, method="hazen"),
-    })
+    }
+    comparison_rows.append(comparison_row)
 
 pooling_comparison = pd.DataFrame(comparison_rows)
 print("\nTop-event method comparison:")
 print(pooling_comparison.to_string(index=False))
 
 
-# %% 21. Create the output folders and plot each component pool
+# %% 21. creates the output folders and plots the success-probability distributions for each component.
 # MATLAB lines 33-37: create a new folder for this run. Do not overwrite a run.
 output_root.mkdir(exist_ok=True)
 run_dir.mkdir(exist_ok=False)
@@ -732,6 +714,7 @@ for component_index in range(number_of_components):
     # 3. Draw each rater's curve and add their contribution to the pool.
     # MATLAB lines 524-528.
     for row_index in component_profiles.index:
+
         profile = component_profiles.loc[row_index]
         rater_id = profile["RaterID"]
         alpha = profile["alpha_p"]
@@ -746,20 +729,14 @@ for component_index in range(number_of_components):
         pool_density = pool_density + weighted_density
 
     # 4. Draw the combined distribution. MATLAB lines 531-532.
-    axes.plot(
-        success_grid, pool_density,
-        label="Exact equal-weight linear pool",
-    )
+    axes.plot(success_grid, pool_density, label="Exact equal-weight linear pool",)
 
-    # 5. Draw the single-Beta approximation, if available. MATLAB 533-535.
+    # 5. Draw the single-Beta approximation. MATLAB 533-535.
     approximate_alpha = pool_results["MomentMatchedAlpha"]
     approximate_beta = pool_results["MomentMatchedBeta"]
     if np.isfinite(approximate_alpha) and np.isfinite(approximate_beta):
         approximate_density = beta_distribution.pdf(success_grid, approximate_alpha, approximate_beta)
-        axes.plot(
-            success_grid, approximate_density,
-            label="Moment-matched Beta (approx.)",
-        )
+        axes.plot(success_grid, approximate_density, label="Moment-matched Beta (approx.)",)
 
     # 6. Mark the mean and label the plot. MATLAB lines 538-543.
     pool_mean = pool_results["PoolMeanP"]
@@ -771,10 +748,11 @@ for component_index in range(number_of_components):
     axes.legend()
     figure.tight_layout()
 
-    # 7. Make the filename. MATLAB safeFilePart, lines 640-643.
+    # 7. Make the filename from the standard component name.
     # Example: "Design Verification" becomes "pool_design_verification".
-    safe_component_name = re.sub(r"[^a-z0-9]+", "_", component.lower())
-    safe_component_name = safe_component_name.strip("_")
+    safe_component_name = component.lower()
+    safe_component_name = safe_component_name.replace(".", "")
+    safe_component_name = safe_component_name.replace(" ", "_")
     figure_name = "pool_" + safe_component_name
 
     # 8. Save both copies and close this plot before starting the next one.
@@ -786,7 +764,7 @@ for component_index in range(number_of_components):
     plt.close(figure)
 
 
-# %% 22. Plot the top-event results
+# %% 22. creates and saves five plots of the overall system’s failure probability, q_top
 # MATLAB lines 225-294. density=True gives a probability density histogram.
 # Repeat the plotting steps explicitly so each figure is easy to follow.
 
@@ -846,8 +824,7 @@ likelihood_density = grid_likelihood / likelihood_area
 # MATLAB lines 266-282: overlay the normalized likelihood curve.
 figure, axes = plt.subplots()
 axes.hist([q_top, q_top_posterior], density=True, label=["Prior", "Posterior"])
-axes.plot(failure_grid, likelihood_density,
-          label=f"Normalized likelihood (k={k_fail}, n={n_test})")
+axes.plot(failure_grid, likelihood_density, label=f"Normalized likelihood (k={k_fail}, n={n_test})")
 axes.set_xlabel(r"$q_{top}$")
 axes.set_ylabel("pdf / normalized likelihood")
 axes.set_title(f"Prior, Posterior, and Likelihood: k={k_fail} out of n={n_test}")
@@ -859,10 +836,7 @@ plt.close(figure)
 
 # MATLAB lines 284-295: compare the two prior pooling methods.
 figure, axes = plt.subplots()
-axes.hist(
-    [q_top_legacy, q_top], density=True,
-    label=["Scores averaged across profiles", "Exact equal-weight linear pool"],
-)
+axes.hist([q_top_legacy, q_top], density=True, label=["Scores averaged across profiles", "Exact equal-weight linear pool"],)
 axes.set_xlabel(r"$q_{top}$")
 axes.set_ylabel("pdf")
 axes.set_title("Score aggregation and exact linear pool")
